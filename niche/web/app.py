@@ -104,6 +104,20 @@ def _start_scheduler(app: Flask, bundle) -> None:
         id="daily_pipeline",
         replace_existing=True,
     )
+
+    def _prune_read_log() -> None:
+        with app.app_context():
+            repo = app.config.get("REPO")
+            if repo:
+                repo.prune_read_log(days=180)
+
+    scheduler.add_job(
+        _prune_read_log,
+        CronTrigger(day_of_week="sun", hour=3, minute=0, timezone=tz),
+        id="weekly_prune_read_log",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
         "Scheduler started: daily pipeline at %s %s",

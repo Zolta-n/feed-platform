@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import threading
+import uuid
 from functools import wraps
 
-from flask import Blueprint, abort, current_app, render_template, request, redirect, url_for
+from flask import Blueprint, abort, current_app, flash, render_template, request, redirect, url_for
 from flask_login import current_user, login_required
 
 bp = Blueprint("admin", __name__)
@@ -59,6 +61,48 @@ def delete_user(user_id: str):
     repo = current_app.config["REPO"]
     repo.delete_user(user_id)
     return redirect(url_for("admin.users"))
+
+
+@bp.route("/run", methods=["POST"])
+@admin_required
+def run_pipeline():
+    from niche.core.pipeline.runner import run_pipeline as _run
+
+    app = current_app._get_current_object()
+    repo = app.config["REPO"]
+    bundle = app.config["BUNDLE"]
+    run_id = uuid.uuid4().hex
+
+    def _worker():
+        with app.app_context():
+            try:
+                _run(bundle, repo, run_id)
+            except Exception:
+                pass
+
+    threading.Thread(target=_worker, daemon=True).start()
+    flash(f"Pipeline run {run_id[:8]}… started in background.", "info")
+    return redirect(url_for("admin.index"))
+
+
+@bp.route("/send-digest", methods=["POST"])
+@admin_required
+def send_digest():
+    from niche.core.email.digest_sender import send_digest as _send
+
+    app = current_app._get_current_object()
+    repo = app.config["REPO"]
+    bundle = app.config["BUNDLE"]
+    email_provider = app.config.get("EMAIL_PROVIDER")
+    app_url = app.config.get("APP_URL", "http://localhost:5000")
+
+    if not email_provider:
+        flash("No email provider configured.", "error")
+        return redirect(url_for("admin.index"))
+
+    sent = _send(bundle, repo, email_provider, app_url)
+    flash(f"Digest sent to {sent} subscriber(s).", "info")
+    return redirect(url_for("admin.index"))
 
 
 @bp.route("/costs")

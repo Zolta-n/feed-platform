@@ -292,6 +292,14 @@ class Repository:
         self._conn.execute("DELETE FROM magic_link_tokens WHERE email=(SELECT email FROM users WHERE id=?)", (user_id,))
         self._conn.commit()
 
+    def prune_read_log(self, days: int = 180) -> int:
+        """Delete read_log entries older than `days`. Returns number of rows deleted."""
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cur = self._conn.execute("DELETE FROM read_log WHERE read_at < ?", (cutoff,))
+        self._conn.commit()
+        return cur.rowcount
+
     # --- magic link tokens ---
 
     def create_magic_link_token(self, email: str, expires_at: str) -> str:

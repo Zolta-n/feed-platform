@@ -9,6 +9,23 @@
   <a href="{{ url_for('admin.costs') }}">Costs</a>
 </div>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="card" style="background:{% if cat=='error' %}#3a1a1a{% else %}#1a2a3a{% endif %}; margin-bottom:1rem; font-family:sans-serif; font-size:0.875rem; color:{% if cat=='error' %}#f87171{% else %}#7dd3fc{% endif %};">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+<div style="display:flex; gap:0.75rem; margin-bottom:2rem;">
+  <form method="post" action="{{ url_for('admin.run_pipeline') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-primary">▶ Run pipeline</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.send_digest') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-primary" style="background:#1e3a2f;">✉ Send digest</button>
+  </form>
+</div>
+
 <h2>Recent pipeline runs</h2>
 {% if runs %}
 <div class="card" style="padding:0;">
