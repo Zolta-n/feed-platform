@@ -54,8 +54,10 @@ def _render_digest(digest_row, repo, bundle):
     items = repo.get_items_by_ids(item_ids)
 
     read_ids = set()
+    saved_ids = set()
     if current_user.is_authenticated:
         read_ids = repo.get_read_item_ids(current_user.id, item_ids)
+        saved_ids = repo.get_saved_item_ids(current_user.id, bundle.config.feed_id)
 
     items_by_id = {r["id"]: r for r in items}
     clusters = []
@@ -80,6 +82,7 @@ def _render_digest(digest_row, repo, bundle):
         digest=digest_row,
         clusters=clusters,
         read_ids=read_ids,
+        saved_ids=saved_ids,
         nav_tabs=nav_tabs,
         all_topics=all_topics,
     )

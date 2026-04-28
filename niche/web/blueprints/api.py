@@ -43,6 +43,29 @@ def export_data():
     return jsonify(data)
 
 
+@bp.route("/save", methods=["POST"])
+@login_required
+def toggle_save():
+    data = request.get_json(silent=True) or {}
+    item_id = data.get("item_id", "")
+    if not item_id:
+        return jsonify({"error": "invalid"}), 400
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    saved = repo.toggle_saved(current_user.id, item_id, bundle.config.feed_id)
+    return jsonify({"saved": saved})
+
+
+@bp.route("/share/<item_id>", methods=["POST"])
+@login_required
+def create_share(item_id: str):
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    app_url = current_app.config.get("APP_URL", "http://localhost:5000")
+    token = repo.create_share_token(item_id, bundle.config.feed_id)
+    return jsonify({"url": f"{app_url}/share/{token}"})
+
+
 @bp.route("/delete-account", methods=["POST"])
 @login_required
 def delete_account():

@@ -7,6 +7,8 @@ from flask_login import current_user, login_required
 
 bp = Blueprint("preferences", __name__)
 
+_VALID_THEME_COLORS = {"red", "blue", "amber", "purple", "teal"}
+
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
@@ -16,6 +18,7 @@ def index():
 
     prefs_row = repo.get_user_preferences(current_user.id)
     prefs = {}
+    theme_color = "red"
     if prefs_row:
         prefs = {
             "topic_weights": json.loads(prefs_row["topic_weights"] or "{}"),
@@ -24,6 +27,10 @@ def index():
             "keyword_blocks": json.loads(prefs_row["keyword_blocks"] or "[]"),
             "keyword_boosts": json.loads(prefs_row["keyword_boosts"] or "[]"),
         }
+        try:
+            theme_color = prefs_row["theme_color"] or "red"
+        except (KeyError, IndexError):
+            theme_color = "red"
 
     if request.method == "POST":
         topic_weights = {}
@@ -48,12 +55,16 @@ def index():
         raw_boosts = request.form.get("keyword_boosts", "")
         keyword_boosts = [w.strip() for w in raw_boosts.split(",") if w.strip()]
 
+        submitted_theme = request.form.get("theme_color", "red")
+        new_theme_color = submitted_theme if submitted_theme in _VALID_THEME_COLORS else "red"
+
         new_prefs = {
             "topic_weights": topic_weights,
             "region_weights": region_weights,
             "company_boosts": {},
             "keyword_blocks": keyword_blocks,
             "keyword_boosts": keyword_boosts,
+            "theme_color": new_theme_color,
         }
         repo.save_user_preferences(current_user.id, bundle.config.feed_id, new_prefs)
         return redirect(url_for("preferences.index"))
@@ -63,4 +74,5 @@ def index():
         topics=bundle.taxonomy.topics,
         regions=bundle.taxonomy.regions,
         prefs=prefs,
+        theme_color=theme_color,
     )

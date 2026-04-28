@@ -44,11 +44,32 @@ def create_app(config: dict | None = None) -> Flask:
         bundle = app.config.get("BUNDLE")
         if not bundle:
             return {}
+
+        # Convert hex accent to rgb components for CSS
+        accent = bundle.config.accent_color.lstrip('#')
+        try:
+            r, g, b = int(accent[0:2], 16), int(accent[2:4], 16), int(accent[4:6], 16)
+            accent_rgb = f"{r},{g},{b}"
+        except Exception:
+            accent_rgb = "192,57,43"
+
+        # Get today's breaking items for ticker
+        breaking_items = []
+        try:
+            from flask_login import current_user
+            repo = app.config.get("REPO")
+            if repo and current_user.is_authenticated:
+                breaking_items = repo.get_breaking_items(bundle.config.feed_id, limit=8)
+        except Exception:
+            pass
+
         return {
             "feed_name": bundle.config.name,
             "feed_tagline": bundle.config.tagline,
             "accent_color": bundle.config.accent_color,
+            "accent_rgb": accent_rgb,
             "logo_path": bundle.config.logo_path,
+            "breaking_items": breaking_items,
         }
 
     from niche.web.blueprints.digest import bp as digest_bp
@@ -57,6 +78,7 @@ def create_app(config: dict | None = None) -> Flask:
     from niche.web.blueprints.archive import bp as archive_bp
     from niche.web.blueprints.api import bp as api_bp
     from niche.web.blueprints.admin import bp as admin_bp
+    from niche.web.blueprints.share import bp as share_bp
 
     app.register_blueprint(digest_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -64,6 +86,7 @@ def create_app(config: dict | None = None) -> Flask:
     app.register_blueprint(archive_bp, url_prefix="/archive")
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/admin")
+    app.register_blueprint(share_bp)
 
     @app.route("/health")
     def health():
