@@ -136,14 +136,14 @@ class Repository:
                 topic_tag, item_type, region_tag, company_tags,
                 translation_failed, translation_provider, relevance_score,
                 published_at, fetched_at, run_id, word_count, read_time_min,
-                is_duplicate, duplicate_of)
+                is_duplicate, duplicate_of, image_url)
                VALUES
                (:id, :feed_id, :url, :url_hash, :title_hash, :title, :title_translated, :body_raw, :body_translated,
                 :summary, :why_it_matters, :source_id, :source_name, :source_language,
                 :topic_tag, :item_type, :region_tag, :company_tags,
                 :translation_failed, :translation_provider, :relevance_score,
                 :published_at, :fetched_at, :run_id, :word_count, :read_time_min,
-                :is_duplicate, :duplicate_of)""",
+                :is_duplicate, :duplicate_of, :image_url)""",
             rows,
         )
         self._conn.commit()
@@ -292,6 +292,72 @@ class Repository:
         self._conn.execute("DELETE FROM magic_link_tokens WHERE email=(SELECT email FROM users WHERE id=?)", (user_id,))
         self._conn.commit()
 
+    # --- saved items ---
+
+    def toggle_saved(self, user_id: str, item_id: str, feed_id: str) -> bool:
+        """Toggle saved state. Returns True if now saved, False if removed."""
+        existing = self._conn.execute(
+            "SELECT id FROM saved_items WHERE user_id=? AND item_id=?", (user_id, item_id)
+        ).fetchone()
+        if existing:
+            self._conn.execute("DELETE FROM saved_items WHERE user_id=? AND item_id=?", (user_id, item_id))
+            self._conn.commit()
+            return False
+        import uuid
+        self._conn.execute(
+            "INSERT INTO saved_items (id, feed_id, user_id, item_id, saved_at) VALUES (?,?,?,?,?)",
+            (uuid.uuid4().hex, feed_id, user_id, item_id, datetime.now(timezone.utc).isoformat()),
+        )
+        self._conn.commit()
+        return True
+
+    def get_saved_item_ids(self, user_id: str, feed_id: str) -> set[str]:
+        rows = self._conn.execute(
+            "SELECT item_id FROM saved_items WHERE user_id=? AND feed_id=?", (user_id, feed_id)
+        ).fetchall()
+        return {r["item_id"] for r in rows}
+
+    def get_saved_items(self, user_id: str, feed_id: str) -> list:
+        return self._conn.execute(
+            """SELECT i.* FROM items i
+               JOIN saved_items s ON s.item_id=i.id
+               WHERE s.user_id=? AND s.feed_id=?
+               ORDER BY s.saved_at DESC""",
+            (user_id, feed_id),
+        ).fetchall()
+
+    # --- share tokens ---
+
+    def create_share_token(self, item_id: str, feed_id: str) -> str:
+        import secrets
+        from datetime import timedelta
+        token = secrets.token_urlsafe(24)
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            "INSERT OR REPLACE INTO share_tokens (token, item_id, feed_id, expires_at, created_at) VALUES (?,?,?,?,?)",
+            (token, item_id, feed_id, expires_at, now),
+        )
+        self._conn.commit()
+        return token
+
+    def get_share_token(self, token: str):
+        return self._conn.execute(
+            "SELECT * FROM share_tokens WHERE token=?", (token,)
+        ).fetchone()
+
+    def get_item_by_id(self, item_id: str):
+        return self._conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+
+    def get_breaking_items(self, feed_id: str, limit: int = 8) -> list:
+        return self._conn.execute(
+            """SELECT * FROM items
+               WHERE feed_id=? AND item_type='breaking' AND is_duplicate=0
+               ORDER BY published_at DESC, fetched_at DESC
+               LIMIT ?""",
+            (feed_id, limit),
+        ).fetchall()
+
     def prune_read_log(self, days: int = 180) -> int:
         """Delete read_log entries older than `days`. Returns number of rows deleted."""
         from datetime import timedelta
@@ -366,14 +432,15 @@ class Repository:
         now = datetime.now(timezone.utc).isoformat()
         self._conn.execute(
             """INSERT INTO preferences (id, user_id, feed_id, region_weights, topic_weights,
-               company_boosts, keyword_boosts, keyword_blocks, updated_at)
-               VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)
+               company_boosts, keyword_boosts, keyword_blocks, theme_color, updated_at)
+               VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
                region_weights=excluded.region_weights,
                topic_weights=excluded.topic_weights,
                company_boosts=excluded.company_boosts,
                keyword_boosts=excluded.keyword_boosts,
                keyword_blocks=excluded.keyword_blocks,
+               theme_color=excluded.theme_color,
                updated_at=excluded.updated_at""",
             (
                 user_id, feed_id,
@@ -382,6 +449,7 @@ class Repository:
                 json.dumps(prefs.get("company_boosts", {})),
                 json.dumps(prefs.get("keyword_boosts", {})),
                 json.dumps(prefs.get("keyword_blocks", [])),
+                prefs.get("theme_color", "red"),
                 now,
             ),
         )
@@ -543,4 +611,5 @@ class Repository:
             "read_time_min": item.read_time_min,
             "is_duplicate": int(item.is_duplicate),
             "duplicate_of": item.duplicate_of,
+            "image_url": item.image_url,
         }

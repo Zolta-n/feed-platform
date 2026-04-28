@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS items (
     word_count INTEGER NOT NULL DEFAULT 0,
     read_time_min REAL NOT NULL DEFAULT 0.0,
     is_duplicate INTEGER NOT NULL DEFAULT 0,
-    duplicate_of TEXT REFERENCES items(id)
+    duplicate_of TEXT REFERENCES items(id),
+    image_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -85,6 +86,7 @@ CREATE TABLE IF NOT EXISTS preferences (
     company_boosts TEXT NOT NULL DEFAULT '{}',
     keyword_boosts TEXT NOT NULL DEFAULT '[]',
     keyword_blocks TEXT NOT NULL DEFAULT '[]',
+    theme_color TEXT NOT NULL DEFAULT 'red',
     updated_at TEXT NOT NULL
 );
 
@@ -137,6 +139,23 @@ CREATE TABLE IF NOT EXISTS llm_cost_log (
     called_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS saved_items (
+    id TEXT PRIMARY KEY,
+    feed_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    item_id TEXT NOT NULL REFERENCES items(id),
+    saved_at TEXT NOT NULL,
+    UNIQUE(user_id, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS share_tokens (
+    token TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES items(id),
+    feed_id TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS magic_link_tokens (
     token TEXT PRIMARY KEY,
     email TEXT NOT NULL,
@@ -157,8 +176,25 @@ CREATE TABLE IF NOT EXISTS source_health (
 """
 
 
+_MIGRATIONS = [
+    "ALTER TABLE items ADD COLUMN image_url TEXT",
+    "ALTER TABLE preferences ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'red'",
+]
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    for sql in _MIGRATIONS:
+        try:
+            conn.execute(sql)
+            conn.commit()
+        except Exception:
+            # Column already exists — safe to ignore
+            pass
+
+
 def create_schema(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(CREATE_TABLES)
     conn.commit()
+    _run_migrations(conn)

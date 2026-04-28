@@ -77,6 +77,7 @@ def dedup(
                 read_time_min=0.0,
                 is_duplicate=is_dup,
                 duplicate_of=None,
+                image_url=raw.image_url,
             )
         )
 

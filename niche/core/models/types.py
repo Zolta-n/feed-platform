@@ -14,6 +14,7 @@ class RawItem:
     published_at: datetime | None
     fetched_at: datetime
     extra: dict = field(default_factory=dict)
+    image_url: str | None = None
 
 
 @dataclass
@@ -46,6 +47,7 @@ class Item:
     read_time_min: float
     is_duplicate: bool
     duplicate_of: str | None
+    image_url: str | None = None
 
 
 @dataclass

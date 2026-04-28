@@ -64,8 +64,31 @@ class RSSSource:
                 language=lang,
                 published_at=_parse_date(entry),
                 fetched_at=now,
+                image_url=_extract_image(entry),
             ))
         return items
+
+
+def _extract_image(entry) -> str | None:
+    # media:content with image type
+    for m in entry.get("media_content", []):
+        url = m.get("url", "")
+        if url and m.get("type", "").startswith("image"):
+            return url
+    # media:thumbnail
+    for t in entry.get("media_thumbnail", []):
+        url = t.get("url", "")
+        if url:
+            return url
+    # enclosures
+    for enc in entry.get("enclosures", []):
+        if enc.get("type", "").startswith("image"):
+            return enc.get("href") or enc.get("url", "")
+    # links with image type
+    for link in entry.get("links", []):
+        if link.get("type", "").startswith("image"):
+            return link.get("href", "")
+    return None
 
 
 def _parse_date(entry) -> datetime | None:
