@@ -27,6 +27,9 @@ class StageResult:
     duration_s: float
 
 
+_MAX_ITEMS_PER_RUN = 50  # cap LLM calls; first run on a new feed may have hundreds of new items
+
+
 def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[StageResult]:
     started_at = datetime.now(timezone.utc).isoformat()
     repo.insert_pipeline_run(run_id, bundle.config.feed_id, started_at)
@@ -74,6 +77,17 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         non_dupes = [i for i in items if not i.is_duplicate]
         logger.info("run_id=%s dedup in=%d out=%d dupes=%d", run_id, len(items), len(non_dupes), len(items) - len(non_dupes))
         results.append(StageResult("dedup", len(raw_items), len(non_dupes), time.monotonic() - t0))
+
+        # Cap items sent to LLM stages to bound cost and latency per run.
+        # Rank by source_weight so the best sources get priority when capped.
+        if len(non_dupes) > _MAX_ITEMS_PER_RUN:
+            source_weight_map = {s.id: s.source_weight for s in bundle.sources}
+            non_dupes = sorted(
+                non_dupes,
+                key=lambda i: source_weight_map.get(i.source_id, 1.0),
+                reverse=True,
+            )[:_MAX_ITEMS_PER_RUN]
+            logger.info("run_id=%s capped to %d items for LLM stages", run_id, _MAX_ITEMS_PER_RUN)
 
         # --- Classify ---
         t0 = time.monotonic()
