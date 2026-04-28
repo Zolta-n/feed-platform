@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Regulatory Updates Feed</title>
+    <link>https://regulatory.stub.invalid</link>
+    <description>Stub regulatory RSS for testing</description>
+    <item>
+      <title>UN R13-H amendment draft open for comment</title>
+      <link>https://regulatory.stub.invalid/notice/1</link>
+      <description>Draft amendment to UN Regulation No. 13-H on braking systems is open for public comment until June 2026.</description>
+      <pubDate>Mon, 28 Apr 2026 06:00:00 +0000</pubDate>
+      <guid>https://regulatory.stub.invalid/notice/1</guid>
+    </item>
+    <item>
+      <title>NHTSA issues advance notice of proposed rulemaking on AEB</title>
+      <link>https://regulatory.stub.invalid/notice/2</link>
+      <description>NHTSA announces ANPRM for mandatory automatic emergency braking on light vehicles.</description>
+      <pubDate>Mon, 28 Apr 2026 07:30:00 +0000</pubDate>
+      <guid>https://regulatory.stub.invalid/notice/2</guid>
+    </item>
+  </channel>
+</rss>
