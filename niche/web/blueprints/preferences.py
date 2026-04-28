@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from flask import Blueprint, current_app, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 bp = Blueprint("preferences", __name__)
@@ -76,3 +76,27 @@ def index():
         prefs=prefs,
         theme_color=theme_color,
     )
+
+
+@bp.route("/theme", methods=["POST"])
+@login_required
+def save_theme():
+    data = request.get_json(silent=True) or {}
+    color = data.get("theme_color", "red")
+    if color not in _VALID_THEME_COLORS:
+        return jsonify({"error": "invalid"}), 400
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    prefs_row = repo.get_user_preferences(current_user.id)
+    prefs = {}
+    if prefs_row:
+        prefs = {
+            "topic_weights": json.loads(prefs_row["topic_weights"] or "{}"),
+            "region_weights": json.loads(prefs_row["region_weights"] or "{}"),
+            "company_boosts": json.loads(prefs_row["company_boosts"] or "{}"),
+            "keyword_blocks": json.loads(prefs_row["keyword_blocks"] or "[]"),
+            "keyword_boosts": json.loads(prefs_row["keyword_boosts"] or "[]"),
+        }
+    prefs["theme_color"] = color
+    repo.save_user_preferences(current_user.id, bundle.config.feed_id, prefs)
+    return jsonify({"ok": True})

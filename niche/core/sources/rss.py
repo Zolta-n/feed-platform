@@ -70,6 +70,7 @@ class RSSSource:
 
 
 def _extract_image(entry) -> str | None:
+    import re
     # media:content with image type
     for m in entry.get("media_content", []):
         url = m.get("url", "")
@@ -88,6 +89,12 @@ def _extract_image(entry) -> str | None:
     for link in entry.get("links", []):
         if link.get("type", "").startswith("image"):
             return link.get("href", "")
+    # <img> tags in summary or content HTML (common in WordPress feeds)
+    _IMG_RE = re.compile(r'<img[^>]+src=["\']([^"\'>\s]+\.(jpg|jpeg|png|webp))', re.I)
+    for html in [entry.get("summary", "")] + [c.get("value", "") for c in entry.get("content", [])]:
+        m = _IMG_RE.search(html)
+        if m:
+            return m.group(1)
     return None
 
 

@@ -100,25 +100,21 @@ if (swatchContainer) {
     if (!swatch) return;
     const hex = swatch.dataset.hex;
     const color = swatch.dataset.color;
-    // Update CSS live
+
+    // Live CSS preview
     document.documentElement.style.setProperty('--accent', hex);
-    // Parse rgb
     const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
     document.documentElement.style.setProperty('--accent-rgb', `${r},${g},${b}`);
-    // Update active state
     swatchContainer.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
     swatch.classList.add('active');
-    // Persist via preferences form (set hidden input if present, or POST directly)
-    const form = swatch.closest('form') || document.querySelector('form#prefs-form');
-    if (form) {
-      let inp = form.querySelector('input[name="theme_color"]');
-      if (!inp) {
-        inp = document.createElement('input');
-        inp.type = 'hidden';
-        inp.name = 'theme_color';
-        form.appendChild(inp);
-      }
-      inp.value = color;
-    }
+
+    // Persist immediately via AJAX — no form submit needed
+    const csrf = getCsrf();
+    const res = await fetch('/preferences/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ theme_color: color }),
+    });
+    if (res.ok) showToast('Theme updated');
   });
 }
