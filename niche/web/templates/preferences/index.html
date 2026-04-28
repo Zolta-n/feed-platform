@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Preferences — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:2rem;">Preferences</h1>
+
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  {% if topics %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin-bottom:1rem;">Topic weights</h2>
+    <p class="meta" style="margin-bottom:1rem;">Set how much you care about each topic. Higher = appears more often.</p>
+    {% for topic in topics %}
+    <div class="form-group">
+      <label for="topic_{{ topic.id }}">{{ topic.label }}</label>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <input type="range" id="topic_{{ topic.id }}" name="topic_{{ topic.id }}"
+               min="0" max="3" step="0.1"
+               value="{{ prefs.get('topic_weights', {}).get(topic.id, 1.0) }}"
+               style="flex:1;" oninput="this.nextElementSibling.textContent=parseFloat(this.value).toFixed(1)">
+        <span style="width:2.5rem; font-family:sans-serif; color:var(--muted);">{{ "%.1f"|format(prefs.get('topic_weights', {}).get(topic.id, 1.0)) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if regions %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin-bottom:1rem;">Region weights</h2>
+    {% for region in regions %}
+    <div class="form-group">
+      <label for="region_{{ region.id }}">{{ region.label }}</label>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <input type="range" id="region_{{ region.id }}" name="region_{{ region.id }}"
+               min="0" max="3" step="0.1"
+               value="{{ prefs.get('region_weights', {}).get(region.id, 1.0) }}"
+               style="flex:1;" oninput="this.nextElementSibling.textContent=parseFloat(this.value).toFixed(1)">
+        <span style="width:2.5rem; font-family:sans-serif; color:var(--muted);">{{ "%.1f"|format(prefs.get('region_weights', {}).get(region.id, 1.0)) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="margin-bottom:1rem;">Keywords</h2>
+    <div class="form-group">
+      <label for="keyword_blocks">Block words (comma-separated)</label>
+      <input type="text" id="keyword_blocks" name="keyword_blocks"
+             value="{{ prefs.get('keyword_blocks', [])|join(', ') }}"
+             placeholder="e.g. acquisition, recall">
+      <p class="meta" style="margin-top:0.4rem;">Items containing these words are excluded.</p>
+    </div>
+    <div class="form-group">
+      <label for="keyword_boosts">Boost words (comma-separated)</label>
+      <input type="text" id="keyword_boosts" name="keyword_boosts"
+             value="{{ prefs.get('keyword_boosts', [])|join(', ') }}"
+             placeholder="e.g. safety, regulation">
+      <p class="meta" style="margin-top:0.4rem;">Items containing these words are ranked higher.</p>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Save preferences</button>
+</form>
+{% endblock %}

@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS preferences (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id),
+    user_id TEXT NOT NULL UNIQUE REFERENCES users(id),
     feed_id TEXT NOT NULL,
     region_weights TEXT NOT NULL DEFAULT '{}',
     topic_weights TEXT NOT NULL DEFAULT '{}',

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import os
@@ -10,10 +11,21 @@ import uuid
 
 import click
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='{"time": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "msg": %(message)s}',
-)
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        record.message = record.getMessage()
+        return json.dumps({
+            "time": self.formatTime(record),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.message,
+        })
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JsonFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 
 
 def _load(feed_dir: str, db_path: str | None):
@@ -80,16 +92,17 @@ def agent():
     """Run a single agent standalone."""
 
 
-def _agent_cmd(name: str, fn):
+def _agent_cmd(name: str, module_path: str, *, pass_repo: bool = True):
     @agent.command(name)
     @click.option("--feed-dir", required=True)
     @click.option("--run-id", default=None)
     @click.option("--db-path", default=None)
     def _cmd(feed_dir, run_id, db_path):
+        mod = importlib.import_module(module_path)
         bundle, repo = _load(feed_dir, db_path)
         rid = run_id or str(uuid.uuid4())
         try:
-            result = fn(bundle, repo, rid)
+            result = mod.run(bundle, rid) if not pass_repo else mod.run(bundle, repo, rid)
             click.echo(f"agent={name} run_id={rid} result={result}")
         finally:
             repo.close()
@@ -97,33 +110,15 @@ def _agent_cmd(name: str, fn):
     return _cmd
 
 
-_agent_cmd("fetch", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.fetcher", fromlist=["run"]).run(bundle, rid)
-))
-_agent_cmd("dedup", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.deduper", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("classify", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.classifier", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("translate", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.translator", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("summarize", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.summarizer", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("rank", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.ranker", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("cluster", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.clusterer", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("compose", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.composer", fromlist=["run"]).run(bundle, repo, rid)
-))
-_agent_cmd("send", lambda bundle, repo, rid: (
-    __import__("niche.core.agents.sender", fromlist=["run"]).run(bundle, repo, rid)
-))
+_agent_cmd("fetch",    "niche.core.agents.fetcher",   pass_repo=False)
+_agent_cmd("dedup",    "niche.core.agents.deduper")
+_agent_cmd("classify", "niche.core.agents.classifier")
+_agent_cmd("translate","niche.core.agents.translator")
+_agent_cmd("summarize","niche.core.agents.summarizer")
+_agent_cmd("rank",     "niche.core.agents.ranker")
+_agent_cmd("cluster",  "niche.core.agents.clusterer")
+_agent_cmd("compose",  "niche.core.agents.composer")
+_agent_cmd("send",     "niche.core.agents.sender")
 
 
 # ---------------------------------------------------------------------------

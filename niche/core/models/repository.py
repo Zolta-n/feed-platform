@@ -182,12 +182,96 @@ class Repository:
         )
         self._conn.commit()
 
+    # --- llm cost ---
+
+    def insert_llm_cost(
+        self,
+        *,
+        feed_id: str,
+        run_id: str | None,
+        agent: str,
+        model: str,
+        prompt_name: str | None,
+        prompt_version: int | None,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
+        usd: float,
+    ) -> None:
+        import uuid
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO llm_cost_log
+               (id, feed_id, run_id, agent, model, prompt_name, prompt_version,
+                input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+                usd, called_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                uuid.uuid4().hex, feed_id, run_id, agent, model,
+                prompt_name, prompt_version,
+                input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
+                usd, now,
+            ),
+        )
+        self._conn.commit()
+
+    def get_daily_cost_usd(self, feed_id: str) -> float:
+        today = datetime.now(timezone.utc).date().isoformat()
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(usd), 0.0) FROM llm_cost_log WHERE feed_id=? AND called_at >= ?",
+            (feed_id, today),
+        ).fetchone()
+        return row[0] if row else 0.0
+
     # --- users ---
 
     def get_user_by_email(self, email: str) -> sqlite3.Row | None:
         return self._conn.execute(
             "SELECT * FROM users WHERE email=? AND deleted_at IS NULL", (email,)
         ).fetchone()
+
+    def get_user_by_id(self, user_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM users WHERE id=? AND deleted_at IS NULL", (user_id,)
+        ).fetchone()
+
+    def create_user(self, email: str, feed_id: str) -> str:
+        import uuid
+        user_id = uuid.uuid4().hex
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO users (id, feed_id, email, is_admin, is_approved, created_at)
+               VALUES (?, ?, ?, 0, 0, ?)""",
+            (user_id, feed_id, email, now),
+        )
+        self._conn.commit()
+        return user_id
+
+    def approve_user(self, user_id: str) -> None:
+        self._conn.execute(
+            "UPDATE users SET is_approved=1 WHERE id=?", (user_id,)
+        )
+        self._conn.commit()
+
+    def get_admin_users(self, feed_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT * FROM users WHERE feed_id=? AND is_admin=1 AND deleted_at IS NULL",
+            (feed_id,),
+        ).fetchall()
+
+    def get_all_users(self, feed_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT * FROM users WHERE feed_id=? AND deleted_at IS NULL ORDER BY created_at DESC",
+            (feed_id,),
+        ).fetchall()
+
+    def update_last_seen(self, user_id: str) -> None:
+        self._conn.execute(
+            "UPDATE users SET last_seen_at=? WHERE id=?",
+            (datetime.now(timezone.utc).isoformat(), user_id),
+        )
+        self._conn.commit()
 
     def upsert_user_admin(self, email: str, feed_id: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -198,6 +282,226 @@ class Repository:
             (feed_id, email, now),
         )
         self._conn.commit()
+
+    def delete_user(self, user_id: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute("UPDATE users SET deleted_at=? WHERE id=?", (now, user_id))
+        self._conn.execute("DELETE FROM preferences WHERE user_id=?", (user_id,))
+        self._conn.execute("DELETE FROM read_log WHERE user_id=?", (user_id,))
+        self._conn.execute("UPDATE feedback SET user_id=NULL WHERE user_id=?", (user_id,))
+        self._conn.execute("DELETE FROM magic_link_tokens WHERE email=(SELECT email FROM users WHERE id=?)", (user_id,))
+        self._conn.commit()
+
+    # --- magic link tokens ---
+
+    def create_magic_link_token(self, email: str, expires_at: str) -> str:
+        import secrets
+        token = secrets.token_hex(32)
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO magic_link_tokens (token, email, expires_at, used, created_at)
+               VALUES (?, ?, ?, 0, ?)""",
+            (token, email, expires_at, now),
+        )
+        self._conn.commit()
+        return token
+
+    def get_magic_link_token(self, token: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM magic_link_tokens WHERE token=?", (token,)
+        ).fetchone()
+
+    def mark_token_used(self, token: str) -> None:
+        self._conn.execute(
+            "UPDATE magic_link_tokens SET used=1 WHERE token=?", (token,)
+        )
+        self._conn.commit()
+
+    # --- digests ---
+
+    def get_latest_digest(self, feed_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            """SELECT * FROM digests WHERE feed_id=? AND user_id IS NULL
+               ORDER BY date DESC LIMIT 1""",
+            (feed_id,),
+        ).fetchone()
+
+    def get_digest_by_date(self, feed_id: str, date: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM digests WHERE feed_id=? AND date=? AND user_id IS NULL",
+            (feed_id, date),
+        ).fetchone()
+
+    def get_items_by_ids(self, ids: list[str]) -> list[sqlite3.Row]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"SELECT * FROM items WHERE id IN ({placeholders})", ids
+        ).fetchall()
+        id_order = {iid: pos for pos, iid in enumerate(ids)}
+        return sorted(rows, key=lambda r: id_order.get(r["id"], len(ids)))
+
+    def get_item(self, item_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM items WHERE id=?", (item_id,)
+        ).fetchone()
+
+    # --- preferences ---
+
+    def get_user_preferences(self, user_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM preferences WHERE user_id=?", (user_id,)
+        ).fetchone()
+
+    def save_user_preferences(self, user_id: str, feed_id: str, prefs: dict) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO preferences (id, user_id, feed_id, region_weights, topic_weights,
+               company_boosts, keyword_boosts, keyword_blocks, updated_at)
+               VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+               region_weights=excluded.region_weights,
+               topic_weights=excluded.topic_weights,
+               company_boosts=excluded.company_boosts,
+               keyword_boosts=excluded.keyword_boosts,
+               keyword_blocks=excluded.keyword_blocks,
+               updated_at=excluded.updated_at""",
+            (
+                user_id, feed_id,
+                json.dumps(prefs.get("region_weights", {})),
+                json.dumps(prefs.get("topic_weights", {})),
+                json.dumps(prefs.get("company_boosts", {})),
+                json.dumps(prefs.get("keyword_boosts", {})),
+                json.dumps(prefs.get("keyword_blocks", [])),
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    # --- feedback ---
+
+    def insert_feedback(self, feed_id: str, user_id: str, item_id: str, signal: str) -> None:
+        import uuid
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO feedback (id, feed_id, user_id, item_id, signal, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (uuid.uuid4().hex, feed_id, user_id, item_id, signal, now),
+        )
+        self._conn.commit()
+
+    def mark_item_read(self, feed_id: str, user_id: str, item_id: str, source: str = "web") -> None:
+        import uuid
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT OR IGNORE INTO read_log (id, feed_id, user_id, item_id, source, read_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (uuid.uuid4().hex, feed_id, user_id, item_id, source, now),
+        )
+        self._conn.commit()
+
+    def get_read_item_ids(self, user_id: str, item_ids: list[str]) -> set[str]:
+        if not item_ids:
+            return set()
+        placeholders = ",".join("?" * len(item_ids))
+        rows = self._conn.execute(
+            f"SELECT item_id FROM read_log WHERE user_id=? AND item_id IN ({placeholders})",
+            [user_id] + item_ids,
+        ).fetchall()
+        return {r["item_id"] for r in rows}
+
+    # --- archive ---
+
+    def get_archive_items(
+        self,
+        feed_id: str,
+        *,
+        keyword: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        limit: int = 50,
+    ) -> list[sqlite3.Row]:
+        query = "SELECT * FROM items WHERE feed_id=? AND is_duplicate=0 AND summary IS NOT NULL"
+        params: list = [feed_id]
+        if keyword:
+            query += " AND (title LIKE ? OR summary LIKE ?)"
+            like = f"%{keyword}%"
+            params.extend([like, like])
+        if date_from:
+            query += " AND fetched_at >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND fetched_at <= ?"
+            params.append(date_to + "T23:59:59")
+        query += " ORDER BY fetched_at DESC LIMIT ?"
+        params.append(limit)
+        return self._conn.execute(query, params).fetchall()
+
+    # --- admin ---
+
+    def get_pipeline_runs(self, feed_id: str, limit: int = 7) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT * FROM pipeline_runs WHERE feed_id=? ORDER BY started_at DESC LIMIT ?",
+            (feed_id, limit),
+        ).fetchall()
+
+    def get_all_source_health(self, feed_id: str) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            """SELECT s.id, s.name, s.source_type, s.url, s.enabled,
+                      sh.last_ok_at, sh.last_error_at, sh.last_error_message,
+                      sh.consecutive_failures, sh.is_flagged
+               FROM sources s
+               LEFT JOIN source_health sh ON sh.source_id = s.id
+               WHERE s.feed_id=?
+               ORDER BY s.name""",
+            (feed_id,),
+        ).fetchall()
+
+    def get_llm_costs_summary(self, feed_id: str, days: int = 30) -> list[sqlite3.Row]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        return self._conn.execute(
+            """SELECT agent, model, prompt_name,
+                      SUM(input_tokens) as input_tokens,
+                      SUM(output_tokens) as output_tokens,
+                      SUM(cache_read_tokens) as cache_read_tokens,
+                      SUM(usd) as usd,
+                      COUNT(*) as call_count
+               FROM llm_cost_log
+               WHERE feed_id=? AND called_at >= ?
+               GROUP BY agent, model, prompt_name
+               ORDER BY usd DESC""",
+            (feed_id, cutoff),
+        ).fetchall()
+
+    # --- GDPR ---
+
+    def export_user_data(self, user_id: str) -> dict:
+        user = self.get_user_by_id(user_id)
+        prefs = self.get_user_preferences(user_id)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
+        reads = self._conn.execute(
+            "SELECT item_id, source, read_at FROM read_log WHERE user_id=? AND read_at>=? AND pruned=0",
+            (user_id, cutoff),
+        ).fetchall()
+        feedback = self._conn.execute(
+            "SELECT item_id, signal, created_at FROM feedback WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
+        return {
+            "user": dict(user) if user else {},
+            "preferences": dict(prefs) if prefs else {},
+            "read_log": [dict(r) for r in reads],
+            "feedback": [dict(f) for f in feedback],
+        }
+
+    def prune_old_read_log(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
+        cur = self._conn.execute(
+            "UPDATE read_log SET pruned=1 WHERE read_at < ? AND pruned=0", (cutoff,)
+        )
+        self._conn.commit()
+        return cur.rowcount
 
     # --- helpers ---
 

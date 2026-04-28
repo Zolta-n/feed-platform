@@ -77,32 +77,32 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
 
         # --- Classify ---
         t0 = time.monotonic()
-        classified = classify(non_dupes, bundle)
+        classified = classify(non_dupes, bundle, repo, run_id)
         repo.update_items(classified)
         logger.info("run_id=%s classify out=%d", run_id, len(classified))
         results.append(StageResult("classify", len(non_dupes), len(classified), time.monotonic() - t0))
 
         # --- Translate ---
         t0 = time.monotonic()
-        translated = translate(classified, bundle)
+        translated = translate(classified, bundle, repo, run_id)
         repo.update_items(translated)
         results.append(StageResult("translate", len(classified), len(translated), time.monotonic() - t0))
 
         # --- Summarize ---
         t0 = time.monotonic()
-        summarized = summarize(translated, bundle)
+        summarized = summarize(translated, bundle, repo, run_id)
         repo.update_items(summarized)
         results.append(StageResult("summarize", len(translated), len(summarized), time.monotonic() - t0))
 
         # --- Rank ---
         t0 = time.monotonic()
-        ranked = rank(summarized, bundle)
+        ranked = rank(summarized, bundle, preferences={}, repo=repo)
         repo.update_items(ranked)
         results.append(StageResult("rank", len(summarized), len(ranked), time.monotonic() - t0))
 
         # --- Cluster ---
         t0 = time.monotonic()
-        clusters = cluster(ranked, bundle)
+        clusters = cluster(ranked, bundle, repo, run_id)
         results.append(StageResult("cluster", len(ranked), len(clusters), time.monotonic() - t0))
 
         # --- Compose ---

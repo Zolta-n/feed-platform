@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{{ (item.title_translated or item.title or 'Item') }} — {{ feed_name }}{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('digest.index') }}" class="btn btn-ghost" style="margin-bottom:1.5rem; display:inline-block;">← Back to digest</a>
+
+<article>
+  <h1 style="margin-bottom:0.5rem;">{{ item.title_translated or item.title or '(no title)' }}</h1>
+  <div class="meta" style="margin-bottom:1.25rem;">
+    {{ item.source_name }}
+    {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+    {% if item.read_time_min %} · {{ "%.0f"|format(item.read_time_min) }} min read{% endif %}
+    <span class="thumbs" style="margin-left:0.5rem;">
+      <button class="thumb-btn" data-signal="up" data-item-id="{{ item.id }}">👍</button>
+      <button class="thumb-btn" data-signal="down" data-item-id="{{ item.id }}">👎</button>
+    </span>
+  </div>
+
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+    {% if item.topic_tag %}<span class="tag tag-accent">{{ item.topic_tag }}</span>{% endif %}
+    {% if item.item_type %}<span class="tag">{{ item.item_type }}</span>{% endif %}
+    {% if item.region_tag %}<span class="tag">{{ item.region_tag }}</span>{% endif %}
+    {% for co in company_tags %}<span class="tag">{{ co }}</span>{% endfor %}
+  </div>
+
+  {% if item.summary %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <p class="summary-text">{{ item.summary }}</p>
+    {% if item.why_it_matters %}
+    <p class="why-matters">{{ item.why_it_matters }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <a href="{{ item.url }}" target="_blank" rel="noopener" class="btn btn-primary">Read full article ↗</a>
+</article>
+{% endblock %}

@@ -60,7 +60,7 @@ def validate_bundle(feed_dir: str) -> None:
     bundle = load_bundle(feed_dir)
 
     # feed_id matches directory name
-    dirname = os.path.basename(feed_dir)
+    dirname = os.path.basename(os.path.abspath(feed_dir))
     if bundle.config.feed_id != dirname:
         raise BundleValidationError(
             f"feed_id '{bundle.config.feed_id}' does not match directory name '{dirname}'"

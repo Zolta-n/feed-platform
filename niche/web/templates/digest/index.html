@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ feed_name }} — {{ digest.date }}{% endblock %}
+{% block content %}
+
+<div style="display:flex; align-items:baseline; gap:1rem; margin-bottom:1rem;">
+  <h1>{{ digest.date }}</h1>
+  <span class="meta">{{ digest.item_count }} items · {{ "%.0f"|format(digest.total_read_time_min) }} min read</span>
+</div>
+
+{% if nav_tabs %}
+<div class="filter-tabs" id="filter-tabs">
+  <button class="filter-tab active" data-topic="all">All</button>
+  {% for tab in nav_tabs %}
+    {% if tab.id != 'all' %}
+    <button class="filter-tab" data-topic="{{ tab.id }}">{{ tab.label }}</button>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% for cluster in clusters %}
+<div class="cluster-header">
+  <h2>{{ cluster.label }}</h2>
+</div>
+{% for item in cluster.cards %}
+<div class="card {% if item.id in read_ids %}read{% endif %}" data-item-id="{{ item.id }}" data-topic="{{ item.topic_tag or '' }}">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+    <div style="flex:1;">
+      <h3>
+        <a href="{{ url_for('digest.item_detail', item_id=item.id) }}" class="item-link" data-item-id="{{ item.id }}">
+          {{ item.title_translated or item.title or '(no title)' }}
+        </a>
+      </h3>
+      <div class="meta" style="margin: 0.25rem 0 0.5rem;">
+        {{ item.source_name }}
+        {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+        {% if item.read_time_min %} · <span class="read-time">{{ "%.0f"|format(item.read_time_min) }} min</span>{% endif %}
+        {% if item.topic_tag %}<span class="tag tag-accent">{{ item.topic_tag }}</span>{% endif %}
+        {% if item.region_tag %}<span class="tag">{{ item.region_tag }}</span>{% endif %}
+      </div>
+      {% if item.summary %}
+      <p class="summary-text">{{ item.summary }}</p>
+      {% endif %}
+      {% if item.why_it_matters %}
+      <p class="why-matters">{{ item.why_it_matters }}</p>
+      {% endif %}
+    </div>
+    <div class="thumbs">
+      <button class="thumb-btn" data-signal="up" data-item-id="{{ item.id }}" title="Useful">👍</button>
+      <button class="thumb-btn" data-signal="down" data-item-id="{{ item.id }}" title="Not useful">👎</button>
+    </div>
+  </div>
+  <div style="margin-top:0.5rem;">
+    <a href="{{ item.url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="font-size:0.8rem; padding:0.25rem 0.75rem;">Read source ↗</a>
+  </div>
+</div>
+{% endfor %}
+{% endfor %}
+
+{% if not clusters %}
+<div class="empty-state">
+  <p>No items in this digest.</p>
+</div>
+{% endif %}
+{% endblock %}
