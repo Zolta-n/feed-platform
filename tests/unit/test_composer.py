@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from niche.core.models.types import Cluster, Item
-from niche.core.pipeline.compose import _DIGEST_MAX_ITEMS, _DIGEST_MIN_ITEMS, _DIGEST_TARGET_MINUTES, compose
+from niche.core.pipeline.compose import _DIGEST_MAX_ITEMS, _DIGEST_MIN_ITEMS, _DIGEST_TARGET_MINUTES, _MIN_ITEMS_PER_TOPIC, compose
 
 
 def _make_item(idx: int, read_time_min: float = 1.0, relevance_score: float = 1.0) -> Item:
@@ -114,5 +114,46 @@ def test_digest_cluster_map_populated(bundle):
 def test_digest_max_items_not_exceeded(bundle):
     items = [_make_item(i, read_time_min=0.1) for i in range(50)]
     clusters = [_make_cluster("All", [f"d-{i}" for i in range(50)])]
+    digest = compose(items, clusters, bundle, "run-001")
+    assert digest.item_count <= _DIGEST_MAX_ITEMS
+
+
+# --- per-topic minimum ---
+
+def test_per_topic_minimum_guaranteed(bundle):
+    topics = ["technology", "market", "north", "south"]
+    items = []
+    for t_idx, topic in enumerate(topics):
+        for i in range(5):
+            item = replace(_make_item(t_idx * 10 + i, read_time_min=1.0), topic_tag=topic)
+            items.append(item)
+    clusters = [_make_cluster("All", [item.id for item in items])]
+    digest = compose(items, clusters, bundle, "run-001")
+    selected = set(digest.item_ids)
+    for topic in topics:
+        count = sum(1 for iid in selected if items[[i.id for i in items].index(iid)].topic_tag == topic)
+        assert count >= _MIN_ITEMS_PER_TOPIC, f"topic={topic} has only {count} items in digest"
+
+
+def test_per_topic_minimum_graceful_when_fewer_available(bundle):
+    # Only 2 items with topic "market" exist — expect exactly 2 in digest, no error
+    items_tech = [_make_item(i, read_time_min=1.0) for i in range(10)]  # topic_tag="technology"
+    items_market = [replace(_make_item(100 + i, read_time_min=1.0), topic_tag="market") for i in range(2)]
+    items = items_tech + items_market
+    clusters = [_make_cluster("All", [item.id for item in items])]
+    digest = compose(items, clusters, bundle, "run-001")
+    selected = set(digest.item_ids)
+    market_count = sum(1 for iid in selected if items[[i.id for i in items].index(iid)].topic_tag == "market")
+    assert market_count == 2
+
+
+def test_per_topic_minimum_respects_max_items(bundle):
+    # 15 topics × 5 items = 75 items; 3 per topic = 45 minimum, which exceeds _DIGEST_MAX_ITEMS=30
+    items = []
+    for t_idx in range(15):
+        for i in range(5):
+            item = replace(_make_item(t_idx * 10 + i, read_time_min=0.1), topic_tag=f"topic{t_idx}")
+            items.append(item)
+    clusters = [_make_cluster("All", [item.id for item in items])]
     digest = compose(items, clusters, bundle, "run-001")
     assert digest.item_count <= _DIGEST_MAX_ITEMS

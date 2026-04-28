@@ -8,6 +8,7 @@ from niche.core.models.types import Cluster, Digest, FeedBundle, Item
 _DIGEST_MIN_ITEMS = 10
 _DIGEST_MAX_ITEMS = 30
 _DIGEST_TARGET_MINUTES = 15.0
+_MIN_ITEMS_PER_TOPIC = 3
 
 
 def compose(
@@ -57,7 +58,27 @@ def _select_items(items: list[Item], clusters: list[Cluster]) -> list[Item]:
                 selected_set.add(iid)
                 break
 
-    # Step 2: fill from top-ranked items not already selected
+    # Step 2: per-topic minimum — top-up each topic to _MIN_ITEMS_PER_TOPIC.
+    # Items are already in descending rank order, so the first unselected item
+    # per topic is always the highest-ranked remaining one.
+    by_topic: dict[str, list[str]] = {}
+    for item in items:
+        if item.topic_tag:
+            by_topic.setdefault(item.topic_tag, []).append(item.id)
+
+    for topic_item_ids in by_topic.values():
+        already = sum(1 for iid in topic_item_ids if iid in selected_set)
+        needed = _MIN_ITEMS_PER_TOPIC - already
+        for iid in topic_item_ids:
+            if needed <= 0 or len(selected_ids) >= _DIGEST_MAX_ITEMS:
+                break
+            if iid in selected_set:
+                continue
+            selected_ids.append(iid)
+            selected_set.add(iid)
+            needed -= 1
+
+    # Step 3: fill from top-ranked items not already selected
     total_time = sum(item_map[iid].read_time_min for iid in selected_ids if iid in item_map)
     for item in items:
         if len(selected_ids) >= _DIGEST_MAX_ITEMS:
