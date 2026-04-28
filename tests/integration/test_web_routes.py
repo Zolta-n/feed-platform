@@ -221,3 +221,91 @@ class TestArchiveRoutes:
         _login(client, app, admin_user)
         resp = client.get("/archive/?q=test")
         assert resp.status_code == 200
+
+
+class TestAdminTriggers:
+    def test_run_pipeline_requires_admin(self, client, app, repo, bundle):
+        repo.create_user("plain@example.com", bundle.config.feed_id)
+        repo.approve_user(repo.get_user_by_email("plain@example.com")["id"])
+        user = repo.get_user_by_email("plain@example.com")
+        _login(client, app, user)
+        resp = client.post("/admin/run")
+        assert resp.status_code == 403
+
+    def test_run_pipeline_starts_and_redirects(self, client, app, admin_user):
+        from unittest.mock import patch
+        _login(client, app, admin_user)
+        with patch("niche.web.blueprints.admin.threading.Thread") as mock_thread:
+            mock_thread.return_value.start = lambda: None
+            resp = client.post("/admin/run", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/admin" in resp.headers["Location"]
+
+    def test_send_digest_requires_admin(self, client, app, repo, bundle):
+        repo.create_user("plain2@example.com", bundle.config.feed_id)
+        repo.approve_user(repo.get_user_by_email("plain2@example.com")["id"])
+        user = repo.get_user_by_email("plain2@example.com")
+        _login(client, app, user)
+        resp = client.post("/admin/send-digest")
+        assert resp.status_code == 403
+
+    def test_send_digest_with_no_digest_redirects(self, client, app, admin_user):
+        _login(client, app, admin_user)
+        resp = client.post("/admin/send-digest", follow_redirects=False)
+        assert resp.status_code == 302
+
+
+class TestGDPR:
+    def test_export_returns_all_sections(self, client, app, admin_user):
+        _login(client, app, admin_user)
+        resp = client.get("/api/export")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "user" in data
+        assert "preferences" in data
+        assert "read_log" in data
+        assert "feedback" in data
+        assert data["user"]["email"] == "admin@example.com"
+
+    def test_delete_account_soft_deletes_user(self, client, app, admin_user, repo):
+        _login(client, app, admin_user)
+        user_id = admin_user["id"]
+        resp = client.post("/api/delete-account")
+        assert resp.status_code == 200
+        # User row should have deleted_at set, not hard-deleted
+        row = repo._conn.execute(
+            "SELECT deleted_at FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+        assert row is not None
+        assert row["deleted_at"] is not None
+
+    def test_delete_account_anonymizes_feedback(self, client, app, admin_user, repo, bundle):
+        _login(client, app, admin_user)
+        user_id = admin_user["id"]
+        # Need a real item in the DB before inserting feedback (FK constraint)
+        repo._conn.execute("PRAGMA foreign_keys = OFF")
+        repo._conn.execute(
+            "INSERT OR IGNORE INTO items (id, feed_id, url, url_hash, title, body_raw, "
+            "source_id, source_name, source_language, fetched_at, run_id, word_count, "
+            "read_time_min, relevance_score, is_duplicate, translation_failed, company_tags) "
+            "VALUES ('test-item','test-fixture','http://x','h1','T','B',"
+            "'s','S','en','2026-01-01','r',10,1.0,1.0,0,0,'[]')"
+        )
+        repo._conn.execute("PRAGMA foreign_keys = ON")
+        repo._conn.commit()
+        repo.insert_feedback(bundle.config.feed_id, user_id, "test-item", "up")
+        client.post("/api/delete-account")
+        # feedback.user_id must be NULL after delete (anonymized)
+        rows = repo._conn.execute(
+            "SELECT user_id FROM feedback WHERE user_id=?", (user_id,)
+        ).fetchall()
+        assert len(rows) == 0
+
+    def test_delete_account_removes_preferences(self, client, app, admin_user, repo):
+        _login(client, app, admin_user)
+        user_id = admin_user["id"]
+        client.post("/api/delete-account")
+        prefs = repo._conn.execute(
+            "SELECT * FROM preferences WHERE user_id=?", (user_id,)
+        ).fetchone()
+        assert prefs is None
