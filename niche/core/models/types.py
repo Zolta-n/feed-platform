@@ -22,6 +22,7 @@ class Item:
     feed_id: str
     url: str
     url_hash: str
+    title_hash: str
     title: str
     title_translated: str | None
     body_raw: str

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from niche.core.models.schema import create_schema
 from niche.core.models.types import Digest, Item
@@ -71,25 +71,74 @@ class Repository:
     # --- items ---
 
     def get_url_hashes(self, feed_id: str, days: int = 7) -> set[str]:
-        cutoff = datetime.now(timezone.utc).isoformat()[:10]
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
         rows = self._conn.execute(
             "SELECT url_hash FROM items WHERE feed_id=? AND fetched_at >= ?",
             (feed_id, cutoff),
         ).fetchall()
         return {r["url_hash"] for r in rows}
 
+    def get_title_hashes(self, feed_id: str, days: int = 7) -> set[str]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+        rows = self._conn.execute(
+            "SELECT title_hash FROM items WHERE feed_id=? AND fetched_at >= ? AND title_hash IS NOT NULL",
+            (feed_id, cutoff),
+        ).fetchall()
+        return {r["title_hash"] for r in rows}
+
+    def get_recent_titles(self, feed_id: str, days: int = 7) -> list[str]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+        rows = self._conn.execute(
+            "SELECT title FROM items WHERE feed_id=? AND fetched_at >= ? AND title IS NOT NULL",
+            (feed_id, cutoff),
+        ).fetchall()
+        return [r["title"] for r in rows]
+
+    def update_source_health(
+        self,
+        source_id: str,
+        feed_id: str,
+        *,
+        success: bool,
+        error_message: str | None = None,
+    ) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        if success:
+            self._conn.execute(
+                """INSERT INTO source_health (source_id, feed_id, last_ok_at, consecutive_failures, is_flagged)
+                   VALUES (?, ?, ?, 0, 0)
+                   ON CONFLICT(source_id) DO UPDATE SET
+                   last_ok_at=excluded.last_ok_at,
+                   consecutive_failures=0,
+                   is_flagged=0""",
+                (source_id, feed_id, now),
+            )
+        else:
+            self._conn.execute(
+                """INSERT INTO source_health
+                   (source_id, feed_id, last_error_at, last_error_message, consecutive_failures, is_flagged)
+                   VALUES (?, ?, ?, ?, 1, 0)
+                   ON CONFLICT(source_id) DO UPDATE SET
+                   last_error_at=excluded.last_error_at,
+                   last_error_message=excluded.last_error_message,
+                   consecutive_failures=consecutive_failures+1,
+                   is_flagged=CASE WHEN consecutive_failures+1 >= 3 THEN 1 ELSE 0 END""",
+                (source_id, feed_id, now, error_message),
+            )
+        self._conn.commit()
+
     def insert_items(self, items: list[Item]) -> None:
         rows = [self._serialize_item(item) for item in items]
         self._conn.executemany(
             """INSERT OR IGNORE INTO items
-               (id, feed_id, url, url_hash, title, title_translated, body_raw, body_translated,
+               (id, feed_id, url, url_hash, title_hash, title, title_translated, body_raw, body_translated,
                 summary, why_it_matters, source_id, source_name, source_language,
                 topic_tag, item_type, region_tag, company_tags,
                 translation_failed, translation_provider, relevance_score,
                 published_at, fetched_at, run_id, word_count, read_time_min,
                 is_duplicate, duplicate_of)
                VALUES
-               (:id, :feed_id, :url, :url_hash, :title, :title_translated, :body_raw, :body_translated,
+               (:id, :feed_id, :url, :url_hash, :title_hash, :title, :title_translated, :body_raw, :body_translated,
                 :summary, :why_it_matters, :source_id, :source_name, :source_language,
                 :topic_tag, :item_type, :region_tag, :company_tags,
                 :translation_failed, :translation_provider, :relevance_score,
@@ -158,6 +207,7 @@ class Repository:
             "feed_id": item.feed_id,
             "url": item.url,
             "url_hash": item.url_hash,
+            "title_hash": item.title_hash,
             "title": item.title,
             "title_translated": item.title_translated,
             "body_raw": item.body_raw,

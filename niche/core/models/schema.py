@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS items (
     feed_id TEXT NOT NULL,
     url TEXT NOT NULL,
     url_hash TEXT NOT NULL,
+    title_hash TEXT,
     title TEXT,
     title_translated TEXT,
     body_raw TEXT,
