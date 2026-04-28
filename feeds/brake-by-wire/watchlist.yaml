@@ -1,0 +1,164 @@
+companies:
+  # --- Tier-1 system integrators (direct customers) ---
+  - id: bosch
+    name: "Bosch"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Robert Bosch", "Bosch Mobility", "Bosch Automotive"]
+    boost: 2.5
+
+  - id: continental
+    name: "Continental"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Continental AG", "Continental Automotive", "ContiTech"]
+    boost: 2.5
+
+  - id: zf
+    name: "ZF"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["ZF Friedrichshafen", "ZF Group", "ZF TRW"]
+    boost: 2.3
+
+  - id: brembo
+    name: "Brembo"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Brembo S.p.A."]
+    boost: 2.3
+
+  - id: hitachi-astemo
+    name: "Hitachi Astemo"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Hitachi Automotive", "Keihin", "Showa", "Nissin Kogyo"]
+    boost: 2.0
+
+  - id: mando
+    name: "Mando"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Mando Corporation", "Mando-Hella Electronics"]
+    boost: 2.0
+
+  - id: knorr-bremse
+    name: "Knorr-Bremse"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Knorr Bremse"]
+    boost: 2.0
+
+  - id: nexteer
+    name: "Nexteer"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Nexteer Automotive"]
+    boost: 1.8
+
+  - id: hyundai-mobis
+    name: "Hyundai Mobis"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Mobis"]
+    boost: 1.8
+
+  - id: advics
+    name: "ADVICS"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["ADVICS Co.", "Aisin Seiki brakes"]
+    boost: 1.8
+
+  - id: aptiv
+    name: "Aptiv"
+    value_chain_role: tier1
+    relationships: [prospect]
+    aliases: ["Aptiv PLC", "Delphi Technologies"]
+    boost: 1.5
+
+  # --- OEMs (end-market demand signals) ---
+  - id: toyota
+    name: "Toyota"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["Toyota Motor", "Lexus"]
+    boost: 1.5
+
+  - id: volkswagen
+    name: "Volkswagen"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["VW", "VW Group", "Volkswagen Group", "Audi", "Porsche", "Skoda", "SEAT", "Cupra"]
+    boost: 1.5
+
+  - id: stellantis
+    name: "Stellantis"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["PSA", "Peugeot", "Citroën", "Fiat", "Chrysler", "Jeep", "Opel", "Vauxhall"]
+    boost: 1.3
+
+  - id: bmw
+    name: "BMW"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["BMW Group", "Mini", "Rolls-Royce"]
+    boost: 1.3
+
+  - id: mercedes
+    name: "Mercedes-Benz"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["Mercedes", "Daimler", "Mercedes Benz"]
+    boost: 1.3
+
+  - id: gm
+    name: "General Motors"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["GM", "Chevrolet", "Cadillac", "GMC", "Buick"]
+    boost: 1.2
+
+  - id: ford
+    name: "Ford"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["Ford Motor", "Lincoln"]
+    boost: 1.2
+
+  - id: tesla
+    name: "Tesla"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["Tesla Inc", "Tesla Motors"]
+    boost: 1.5
+
+  - id: byd
+    name: "BYD"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["BYD Auto", "BYD Company"]
+    boost: 1.4
+
+  - id: hyundai
+    name: "Hyundai"
+    value_chain_role: oem
+    relationships: [watch]
+    aliases: ["Hyundai Motor", "Kia", "Genesis"]
+    boost: 1.2
+
+  # --- Technology / competitive watch ---
+  - id: mobileye
+    name: "Mobileye"
+    value_chain_role: technology
+    relationships: [watch]
+    aliases: ["Mobileye Global"]
+    boost: 1.3
+
+  - id: sensata
+    name: "Sensata Technologies"
+    value_chain_role: tier2peer
+    relationships: [competitor]
+    aliases: ["Sensata"]
+    boost: 1.5

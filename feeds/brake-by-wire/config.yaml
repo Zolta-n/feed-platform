@@ -1,0 +1,10 @@
+feed_id: brake-by-wire
+name: "Brake-by-Wire Intelligence"
+tagline: "Daily briefing for brake-by-wire actuator suppliers"
+accent_color: "#c0392b"
+logo_path: null
+ui_languages: ["en"]
+default_ui_language: en
+timezone: Europe/Berlin
+daily_run_time: "05:30"
+from_email: "digest@yourdomain.com"

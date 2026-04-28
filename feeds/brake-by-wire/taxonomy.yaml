@@ -1,0 +1,47 @@
+topics:
+  - id: tier1
+    label: "Tier-1"
+    weight: 1.3
+  - id: oem
+    label: "OEM"
+    weight: 1.2
+  - id: regulation
+    label: "Regulation"
+    weight: 1.1
+  - id: technology
+    label: "Technology"
+    weight: 1.0
+
+regions:
+  - id: europe
+    label: "Europe"
+  - id: americas
+    label: "Americas"
+  - id: asia
+    label: "Asia"
+
+item_types:
+  - id: breaking
+    label: "Breaking"
+    badge_color: "#e74c3c"
+  - id: analysis
+    label: "Analysis"
+    badge_color: "#2980b9"
+  - id: report
+    label: "Report"
+    badge_color: "#7f8c8d"
+  - id: exclusive
+    label: "Exclusive"
+    badge_color: "#8e44ad"
+
+nav_tabs:
+  - id: all
+    label: "ALL"
+  - id: tier1
+    label: "TIER-1"
+  - id: oem
+    label: "OEM"
+  - id: regulation
+    label: "REGULATION"
+  - id: technology
+    label: "TECHNOLOGY"

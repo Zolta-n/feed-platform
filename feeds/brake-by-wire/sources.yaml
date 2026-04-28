@@ -1,0 +1,140 @@
+sources:
+  # --- Trade press: English ---
+  - id: electrive-en
+    type: rss
+    url: "https://www.electrive.com/feed/"
+    name: "Electrive (EN)"
+    default_region: europe
+    default_topic: technology
+    source_weight: 1.2
+    enabled: true
+
+  - id: automotive-world
+    type: rss
+    url: "https://www.automotiveworld.com/feed/"
+    name: "Automotive World"
+    default_region: europe
+    default_topic: tier1
+    source_weight: 1.1
+    enabled: true
+
+  - id: just-auto
+    type: rss
+    url: "https://www.just-auto.com/feed/"
+    name: "Just Auto"
+    default_region: europe
+    default_topic: tier1
+    source_weight: 1.1
+    enabled: true
+
+  - id: green-car-reports
+    type: rss
+    url: "https://www.greencarreports.com/rss.xml"
+    name: "Green Car Reports"
+    default_region: americas
+    default_topic: technology
+    source_weight: 1.0
+    enabled: true
+
+  - id: sae-international
+    type: rss
+    url: "https://www.sae.org/news/rss"
+    name: "SAE International"
+    default_region: americas
+    default_topic: technology
+    source_weight: 1.3
+    enabled: true
+
+  # --- Trade press: German (will be translated by DeepL) ---
+  - id: electrive-de
+    type: rss
+    url: "https://www.electrive.net/feed/"
+    name: "Electrive (DE)"
+    default_region: europe
+    default_topic: technology
+    source_weight: 1.2
+    enabled: true
+
+  # --- Chinese sources (will be translated) ---
+  - id: carnewschina
+    type: rss
+    url: "https://carnewschina.com/feed/"
+    name: "CarNewsChina"
+    default_region: asia
+    default_topic: oem
+    source_weight: 1.1
+    enabled: true
+
+  - id: cnevpost
+    type: rss
+    url: "https://cnevpost.com/feed/"
+    name: "CnEVPost"
+    default_region: asia
+    default_topic: oem
+    source_weight: 1.0
+    enabled: true
+
+  - id: gasgoo
+    type: rss
+    url: "https://autonews.gasgoo.com/rss.xml"
+    name: "Gasgoo Auto News"
+    default_region: asia
+    default_topic: oem
+    source_weight: 1.0
+    enabled: true
+
+  # --- Google News keyword queries ---
+  - id: gnews-brake-by-wire
+    type: google_news
+    url: "https://news.google.com/rss/search?q=brake+by+wire&hl=en-US&gl=US&ceid=US:en"
+    name: "Google News: brake-by-wire"
+    default_region: null
+    default_topic: technology
+    source_weight: 1.4
+    enabled: true
+
+  - id: gnews-bbw-regulation
+    type: google_news
+    url: "https://news.google.com/rss/search?q=%22brake+by+wire%22+regulation+safety&hl=en-US&gl=US&ceid=US:en"
+    name: "Google News: BBW regulation"
+    default_region: null
+    default_topic: regulation
+    source_weight: 1.3
+    enabled: true
+
+  - id: gnews-automotive-braking
+    type: google_news
+    url: "https://news.google.com/rss/search?q=automotive+braking+system+supplier&hl=en-US&gl=US&ceid=US:en"
+    name: "Google News: braking systems"
+    default_region: null
+    default_topic: tier1
+    source_weight: 1.2
+    enabled: true
+
+  - id: gnews-bosch-brakes
+    type: google_news
+    url: "https://news.google.com/rss/search?q=Bosch+Continental+ZF+brake+actuator&hl=en-US&gl=US&ceid=US:en"
+    name: "Google News: Tier-1 brakes"
+    default_region: null
+    default_topic: tier1
+    source_weight: 1.3
+    enabled: true
+
+  - id: gnews-ev-braking
+    type: google_news
+    url: "https://news.google.com/rss/search?q=electric+vehicle+brake+regenerative&hl=en-US&gl=US&ceid=US:en"
+    name: "Google News: EV braking"
+    default_region: null
+    default_topic: technology
+    source_weight: 1.1
+    enabled: true
+
+  # --- Regulatory ---
+  - id: nhtsa-recalls
+    type: regulatory
+    url: "https://www.nhtsa.gov/rss/recalls-rss.xml"
+    name: "NHTSA Recalls"
+    default_region: americas
+    default_topic: regulation
+    source_weight: 1.5
+    enabled: true
