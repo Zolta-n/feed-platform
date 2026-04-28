@@ -10,6 +10,9 @@ import os
 import uuid
 
 import click
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class _JsonFormatter(logging.Formatter):

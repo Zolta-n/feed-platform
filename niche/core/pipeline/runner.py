@@ -30,6 +30,47 @@ class StageResult:
 _MAX_ITEMS_PER_RUN = 50  # cap LLM calls; first run on a new feed may have hundreds of new items
 
 
+def _diverse_cap(items: list, bundle, cap: int) -> list:
+    """Return up to `cap` items with proportional representation across sources.
+
+    Each source contributes items in proportion to its source_weight; sources
+    with fewer items are not penalised. This prevents a single high-volume
+    source from filling the entire cap budget.
+    """
+    import math
+    from collections import defaultdict
+
+    source_weight_map = {s.id: s.source_weight for s in bundle.sources}
+    buckets: dict[str, list] = defaultdict(list)
+    for item in items:
+        buckets[item.source_id].append(item)
+
+    total_weight = sum(source_weight_map.get(sid, 1.0) for sid in buckets)
+    # Allocate slots proportionally; each source gets at least 1 slot
+    slots: dict[str, int] = {}
+    remaining = cap
+    for sid, bucket in buckets.items():
+        w = source_weight_map.get(sid, 1.0)
+        alloc = max(1, math.floor(cap * w / total_weight))
+        slots[sid] = min(alloc, len(bucket))
+        remaining -= slots[sid]
+
+    # Distribute any leftover slots to the sources with the most items first
+    if remaining > 0:
+        for sid in sorted(buckets, key=lambda s: len(buckets[s]), reverse=True):
+            extra = min(remaining, len(buckets[sid]) - slots[sid])
+            if extra > 0:
+                slots[sid] += extra
+                remaining -= extra
+            if remaining == 0:
+                break
+
+    result = []
+    for sid, bucket in buckets.items():
+        result.extend(bucket[:slots[sid]])
+    return result
+
+
 def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[StageResult]:
     started_at = datetime.now(timezone.utc).isoformat()
     repo.insert_pipeline_run(run_id, bundle.config.feed_id, started_at)
@@ -79,15 +120,11 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         results.append(StageResult("dedup", len(raw_items), len(non_dupes), time.monotonic() - t0))
 
         # Cap items sent to LLM stages to bound cost and latency per run.
-        # Rank by source_weight so the best sources get priority when capped.
+        # Uses a round-robin across sources weighted by source_weight so no
+        # single prolific source crowds out all others.
         if len(non_dupes) > _MAX_ITEMS_PER_RUN:
-            source_weight_map = {s.id: s.source_weight for s in bundle.sources}
-            non_dupes = sorted(
-                non_dupes,
-                key=lambda i: source_weight_map.get(i.source_id, 1.0),
-                reverse=True,
-            )[:_MAX_ITEMS_PER_RUN]
-            logger.info("run_id=%s capped to %d items for LLM stages", run_id, _MAX_ITEMS_PER_RUN)
+            non_dupes = _diverse_cap(non_dupes, bundle, _MAX_ITEMS_PER_RUN)
+            logger.info("run_id=%s capped to %d items for LLM stages", run_id, len(non_dupes))
 
         # --- Classify ---
         t0 = time.monotonic()
