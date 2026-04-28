@@ -235,7 +235,7 @@ Core code loads the active feed bundle at startup. **No core module imports anyt
 
 ### 7.4 Naming implication
 
-"BRAKEWIRE" from the mockup is a **feed-level brand**, not the platform name. The platform needs its own internal identity (working suggestions: *WireWatch*, *Signal*, *Niche*, *Radar*). Each deployed feed renders its own brand (BrakeWire, SteerWire, ActuatorBeat, …) from config. See Open Questions.
+**BrakeByWire** is the feed-level brand rendered from `feeds/brake-by-wire/config.yaml`. The platform internal identity is **Niche** — used in code namespaces, Docker image names, repo references, and the admin dashboard. Each deployed feed renders its own brand (BrakeByWire, SteerWire, ActuatorBeat, …) from config.
 
 ## 8. Success Metrics
 
@@ -257,15 +257,17 @@ Core code loads the active feed bundle at startup. **No core module imports anyt
 
 ## 9. Open Questions
 
-1. **Translation strategy:** Claude Haiku for all translation (simpler) or DeepL free tier + Claude for Chinese only (more accurate, more moving parts)?
-2. **Digest size:** Fixed count (e.g. 20 items) or adaptive ("enough to fill ~15-min read")?
-3. **Clustering approach:** Rule-based (by topic/company tag) or semantic (embeddings + clustering)? Start simple either way.
-4. **Ranker v1 design:** Source weights + topic weights + company-tag boost + thumbs signal — confirm this is the right starting point before investing in embeddings-based ranking.
-5. **Admin identity:** Sole admin or delegate to 1–2 trusted colleagues?
-6. **Platform vs. feed naming:** Mockup uses "BRAKEWIRE — Industry Intelligence" as the feed brand. Platform name TBD (candidates: *WireWatch*, *Signal*, *Niche*, *Radar*). Finalize before first deploy.
-7. **Hosting commitment:** Synology (Docker, flexible stack) vs. PythonAnywhere (Python-only, simpler deploy) — needs decision before SPEC.md.
+_All pre-SPEC open questions resolved. See Resolved section below._
 
 ### Resolved
+- **Platform name:** Niche (internal identity — namespaces, Docker images, admin dashboard).
+- **Feed brand:** BrakeByWire (rendered from `feeds/brake-by-wire/config.yaml`; future feeds render their own brand).
+- **Hosting:** PythonAnywhere for MVP (Python-only, WSGI, no Docker); architecture kept portable for later migration to Synology (Docker Compose). No PythonAnywhere-specific calls in `core/`.
+- **Admin identity:** `is_admin` flag on the user table; promoted via CLI (`agent admin promote --email=...`). No admin-management UI in v1.
+- **Translation:** DeepL primary for all non-English content (Chinese, German, Japanese → English); Claude Haiku fallback on DeepL failure. UI languages: English and German only (Chinese UI deferred).
+- **Digest size:** Adaptive to ~15-min read (est. read time per item), minimum 10 items, maximum 30 items.
+- **Clustering:** Rule-based (topic tag + company tag overlap) for v1; semantic embeddings deferred.
+- **Ranker v1:** `source_weight × topic_weight × company_boost + recency_decay + thumbs_signal`. All weights in taxonomy/preferences; no domain logic in ranker code.
 - Registration: open email sign-up with admin approval.
 - Watchlist seed (split by value-chain role):
   - **Tier-1 (customers + competitors):** Bosch, Continental, ZF, Brembo, Hitachi Astemo, Mando, Knorr-Bremse, Nexteer, Hyundai Mobis, ADVICS, Haldex.
@@ -280,7 +282,7 @@ Core code loads the active feed bundle at startup. **No core module imports anyt
 
 ## Appendix A: Design Direction
 
-Based on initial mockup (BRAKEWIRE — Industry Intelligence):
+Based on initial mockup (BrakeByWire — Industry Intelligence):
 
 - **Aesthetic:** dark editorial, Bloomberg / The Information-adjacent. High contrast, generous whitespace.
 - **Typography:** bold condensed or serif headlines; uppercase monospaced labels and tags.
