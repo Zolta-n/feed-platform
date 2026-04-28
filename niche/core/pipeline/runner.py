@@ -52,7 +52,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
 
         # --- Fetch ---
         t0 = time.monotonic()
-        sources = build_sources(list(bundle.sources))
+        sources = build_sources(list(bundle.sources), repo)
         raw_items = []
         for source in sources:
             fetched = source.fetch()
@@ -63,8 +63,13 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         # --- Dedup ---
         t0 = time.monotonic()
         existing_hashes = repo.get_url_hashes(bundle.config.feed_id)
+        existing_title_hashes = repo.get_title_hashes(bundle.config.feed_id)
+        recent_titles = repo.get_recent_titles(bundle.config.feed_id)
         source_names = {s.id: s.name for s in bundle.sources}
-        items = dedup(raw_items, existing_hashes, bundle.config.feed_id, run_id, source_names)
+        items = dedup(
+            raw_items, existing_hashes, existing_title_hashes,
+            recent_titles, bundle.config.feed_id, run_id, source_names,
+        )
         repo.insert_items(items)
         non_dupes = [i for i in items if not i.is_duplicate]
         logger.info("run_id=%s dedup in=%d out=%d dupes=%d", run_id, len(items), len(non_dupes), len(items) - len(non_dupes))

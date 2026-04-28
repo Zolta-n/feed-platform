@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import hashlib
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -12,27 +13,39 @@ _TRACKING_PARAMS = frozenset([
     "ref", "source", "fbclid", "gclid",
 ])
 
+_FUZZY_THRESHOLD = 0.95
+
 
 def dedup(
     raw_items: list[RawItem],
     existing_hashes: set[str],
+    existing_title_hashes: set[str],
+    recent_titles: list[str],
     feed_id: str,
     run_id: str,
     source_names: dict[str, str] | None = None,
 ) -> list[Item]:
-    """
-    Convert RawItems to Items and flag duplicates.
-    M1 stub: converts all items, marks none as duplicate (real logic added in M2).
-    """
     now = datetime.now(timezone.utc)
-    seen_hashes: set[str] = set(existing_hashes)
+    seen_url_hashes: set[str] = set(existing_hashes)
+    seen_title_hashes: set[str] = set(existing_title_hashes)
+    seen_titles: list[str] = [t.lower().strip() for t in recent_titles]
     items: list[Item] = []
 
     for raw in raw_items:
         url_hash = _url_hash(raw.url)
-        is_dup = url_hash in seen_hashes
+        th = _title_hash(raw.title)
+        normalized_title = raw.title.lower().strip()
+
+        is_dup = (
+            url_hash in seen_url_hashes
+            or th in seen_title_hashes
+            or _fuzzy_match(normalized_title, seen_titles)
+        )
+
         if not is_dup:
-            seen_hashes.add(url_hash)
+            seen_url_hashes.add(url_hash)
+            seen_title_hashes.add(th)
+            seen_titles.append(normalized_title)
 
         items.append(
             Item(
@@ -40,6 +53,7 @@ def dedup(
                 feed_id=feed_id,
                 url=raw.url,
                 url_hash=url_hash,
+                title_hash=th,
                 title=raw.title,
                 title_translated=None,
                 body_raw=raw.body[:1000],
@@ -69,6 +83,14 @@ def dedup(
     return items
 
 
+def _fuzzy_match(title: str, known_titles: list[str]) -> bool:
+    for known in known_titles:
+        ratio = difflib.SequenceMatcher(None, title, known).ratio()
+        if ratio >= _FUZZY_THRESHOLD:
+            return True
+    return False
+
+
 def _normalize_url(url: str) -> str:
     parsed = urlparse(url.lower().strip())
     qs = {k: v for k, v in parse_qs(parsed.query).items() if k not in _TRACKING_PARAMS}
@@ -82,6 +104,10 @@ def _normalize_url(url: str) -> str:
 
 def _url_hash(url: str) -> str:
     return hashlib.sha256(_normalize_url(url).encode()).hexdigest()
+
+
+def _title_hash(title: str) -> str:
+    return hashlib.sha256(title.lower().strip().encode()).hexdigest()
 
 
 def _make_id(url: str, fetched_at: datetime) -> str:
