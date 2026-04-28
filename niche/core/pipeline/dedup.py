@@ -18,6 +18,7 @@ def dedup(
     existing_hashes: set[str],
     feed_id: str,
     run_id: str,
+    source_names: dict[str, str] | None = None,
 ) -> list[Item]:
     """
     Convert RawItems to Items and flag duplicates.
@@ -46,7 +47,7 @@ def dedup(
                 summary=None,
                 why_it_matters=None,
                 source_id=raw.source_id,
-                source_name=raw.source_id,
+                source_name=(source_names or {}).get(raw.source_id, raw.source_id),
                 source_language=raw.language,
                 topic_tag=None,
                 item_type=None,

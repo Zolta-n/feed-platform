@@ -35,6 +35,21 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
     total_usd = 0.0
 
     try:
+        # Sync sources from bundle config into DB before any item inserts
+        for src_cfg in bundle.sources:
+            repo.upsert_source({
+                "id": src_cfg.id,
+                "feed_id": src_cfg.feed_id,
+                "source_type": src_cfg.source_type,
+                "url": src_cfg.url,
+                "name": src_cfg.name,
+                "default_region": src_cfg.default_region,
+                "default_topic": src_cfg.default_topic,
+                "source_weight": src_cfg.source_weight,
+                "enabled": int(src_cfg.enabled),
+                "added_by": "config",
+            })
+
         # --- Fetch ---
         t0 = time.monotonic()
         sources = build_sources(list(bundle.sources))
@@ -48,7 +63,8 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         # --- Dedup ---
         t0 = time.monotonic()
         existing_hashes = repo.get_url_hashes(bundle.config.feed_id)
-        items = dedup(raw_items, existing_hashes, bundle.config.feed_id, run_id)
+        source_names = {s.id: s.name for s in bundle.sources}
+        items = dedup(raw_items, existing_hashes, bundle.config.feed_id, run_id, source_names)
         repo.insert_items(items)
         non_dupes = [i for i in items if not i.is_duplicate]
         logger.info("run_id=%s dedup in=%d out=%d dupes=%d", run_id, len(items), len(non_dupes), len(items) - len(non_dupes))
