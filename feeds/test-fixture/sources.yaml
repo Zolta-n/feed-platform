@@ -1,0 +1,9 @@
+sources:
+  - id: stub-source-1
+    type: stub
+    url: null
+    name: "Stub Source One"
+    default_region: north
+    default_topic: technology
+    source_weight: 1.0
+    enabled: true

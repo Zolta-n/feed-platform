@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Check your email — {{ feed_name }}{% endblock %}
+{% block content %}
+<div style="max-width:420px; margin:4rem auto; text-align:center;">
+  {% if pending %}
+  <h1>Access request sent</h1>
+  <p class="meta" style="margin-top:1rem;">Your account is pending approval by an admin. You'll receive a sign-in link once approved.</p>
+  {% else %}
+  <h1>Check your email</h1>
+  <p class="meta" style="margin-top:1rem;">We've sent a sign-in link to your email address. The link expires in 15 minutes.</p>
+  {% endif %}
+  <a href="{{ url_for('auth.request_login') }}" class="btn btn-ghost" style="margin-top:2rem;">← Back</a>
+</div>
+{% endblock %}

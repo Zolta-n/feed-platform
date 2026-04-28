@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}LLM Costs — Admin — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:0.5rem;">Admin</h1>
+<div class="nav-links" style="margin-bottom:2rem; font-family:sans-serif; display:flex; gap:1rem; font-size:0.875rem;">
+  <a href="{{ url_for('admin.index') }}">Pipeline</a>
+  <a href="{{ url_for('admin.sources') }}">Sources</a>
+  <a href="{{ url_for('admin.users') }}">Users</a>
+  <a href="{{ url_for('admin.costs') }}" class="active">Costs</a>
+</div>
+
+<div style="display:flex; align-items:baseline; gap:1.5rem; margin-bottom:1.5rem;">
+  <h2 style="margin:0;">LLM costs — last {{ days }} days</h2>
+  <span class="meta">Total: <strong>${{ "%.4f"|format(total_usd) }}</strong></span>
+  <div style="margin-left:auto;">
+    <a href="?days=7" class="btn btn-ghost" style="font-size:0.8rem; padding:0.25rem 0.6rem; {% if days==7 %}border-color:var(--accent); color:var(--accent);{% endif %}">7d</a>
+    <a href="?days=30" class="btn btn-ghost" style="font-size:0.8rem; padding:0.25rem 0.6rem; {% if days==30 %}border-color:var(--accent); color:var(--accent);{% endif %}">30d</a>
+  </div>
+</div>
+
+{% if summary %}
+<div class="card" style="padding:0;">
+<table>
+  <thead>
+    <tr>
+      <th>Agent</th>
+      <th>Model</th>
+      <th>Prompt</th>
+      <th>Calls</th>
+      <th>Input tokens</th>
+      <th>Output tokens</th>
+      <th>Cache reads</th>
+      <th>Cost (USD)</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in summary %}
+    <tr>
+      <td>{{ row.agent }}</td>
+      <td><span class="tag">{{ row.model }}</span></td>
+      <td>{{ row.prompt_name or '—' }}</td>
+      <td>{{ row.call_count }}</td>
+      <td>{{ "{:,}".format(row.input_tokens) }}</td>
+      <td>{{ "{:,}".format(row.output_tokens) }}</td>
+      <td>{{ "{:,}".format(row.cache_read_tokens) }}</td>
+      <td>${{ "%.4f"|format(row.usd) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">No LLM costs recorded yet.</div>
+{% endif %}
+{% endblock %}

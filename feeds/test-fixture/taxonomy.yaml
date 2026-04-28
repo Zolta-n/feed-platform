@@ -1,0 +1,29 @@
+topics:
+  - id: technology
+    label: "Technology"
+    weight: 1.0
+  - id: market
+    label: "Market"
+    weight: 1.0
+
+regions:
+  - id: north
+    label: "North"
+  - id: south
+    label: "South"
+
+item_types:
+  - id: brief
+    label: "Brief"
+    badge_color: "#AAAAAA"
+  - id: deep
+    label: "Deep"
+    badge_color: "#444444"
+
+nav_tabs:
+  - id: all
+    label: "ALL"
+  - id: technology
+    label: "TECHNOLOGY"
+  - id: market
+    label: "MARKET"

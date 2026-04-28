@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:0.5rem;">Admin</h1>
+<div class="nav-links" style="margin-bottom:2rem; font-family:sans-serif; display:flex; gap:1rem; font-size:0.875rem;">
+  <a href="{{ url_for('admin.index') }}" class="active">Pipeline</a>
+  <a href="{{ url_for('admin.sources') }}">Sources</a>
+  <a href="{{ url_for('admin.users') }}">Users</a>
+  <a href="{{ url_for('admin.costs') }}">Costs</a>
+</div>
+
+<h2>Recent pipeline runs</h2>
+{% if runs %}
+<div class="card" style="padding:0;">
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Status</th>
+      <th>Fetched</th>
+      <th>After dedup</th>
+      <th>In digest</th>
+      <th>Cost</th>
+      <th>Duration</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for run in runs %}
+    <tr>
+      <td>{{ run.started_at[:16] }}</td>
+      <td>
+        {% if run.status == 'complete' %}<span class="status-ok">✓ complete</span>
+        {% elif run.status == 'running' %}<span style="color:var(--accent);">⟳ running</span>
+        {% else %}<span class="status-err">✗ {{ run.status }}</span>{% endif %}
+      </td>
+      <td>{{ run.items_fetched }}</td>
+      <td>{{ run.items_after_dedup }}</td>
+      <td>{{ run.items_in_digest }}</td>
+      <td>${{ "%.4f"|format(run.total_usd) }}</td>
+      <td>
+        {% if run.finished_at %}
+          {% set dur = (run.finished_at[:19] | length) %}
+          {{ run.finished_at[:16] }}
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% if run.error_message %}
+    <tr><td colspan="7" class="status-err" style="font-size:0.8rem; padding-top:0;">{{ run.error_message }}</td></tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">No pipeline runs yet.</div>
+{% endif %}
+{% endblock %}

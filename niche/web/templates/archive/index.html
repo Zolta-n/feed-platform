@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Archive — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:1.5rem;">Archive</h1>
+
+<form method="get" style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; align-items:flex-end;">
+  <div style="flex:2; min-width:180px;">
+    <label for="q">Search</label>
+    <input type="text" id="q" name="q" value="{{ keyword }}" placeholder="keyword in title or summary">
+  </div>
+  <div style="flex:1; min-width:140px;">
+    <label for="from">From</label>
+    <input type="date" id="from" name="from" value="{{ date_from }}">
+  </div>
+  <div style="flex:1; min-width:140px;">
+    <label for="to">To</label>
+    <input type="date" id="to" name="to" value="{{ date_to }}">
+  </div>
+  <button type="submit" class="btn btn-primary">Search</button>
+  {% if keyword or date_from or date_to %}
+  <a href="{{ url_for('archive.index') }}" class="btn btn-ghost">Clear</a>
+  {% endif %}
+</form>
+
+{% if items %}
+<p class="meta" style="margin-bottom:1rem;">{{ items|length }} result{% if items|length != 1 %}s{% endif %}</p>
+{% for item in items %}
+<div class="card">
+  <h3><a href="{{ url_for('digest.item_detail', item_id=item.id) }}">{{ item.title_translated or item.title or '(no title)' }}</a></h3>
+  <div class="meta" style="margin: 0.25rem 0 0.5rem;">
+    {{ item.source_name }}
+    {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+    {% if item.topic_tag %}<span class="tag tag-accent">{{ item.topic_tag }}</span>{% endif %}
+  </div>
+  {% if item.summary %}<p class="summary-text" style="font-size:0.9rem;">{{ item.summary[:220] }}{% if item.summary|length > 220 %}…{% endif %}</p>{% endif %}
+</div>
+{% endfor %}
+{% elif keyword or date_from or date_to %}
+<div class="empty-state">No results found.</div>
+{% else %}
+<div class="empty-state">Search the article archive above.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test RSS Feed</title>
+    <link>https://rss.stub.invalid</link>
+    <description>Stub RSS feed for testing</description>
+    <item>
+      <title>Brake actuator reliability study published</title>
+      <link>https://rss.stub.invalid/article/1</link>
+      <description>A new study examines brake actuator reliability metrics across fleets.</description>
+      <pubDate>Mon, 28 Apr 2026 08:00:00 +0000</pubDate>
+      <guid>https://rss.stub.invalid/article/1</guid>
+    </item>
+    <item>
+      <title>Tier-1 supplier announces new contract</title>
+      <link>https://rss.stub.invalid/article/2</link>
+      <description>Major Tier-1 supplier secures multi-year actuator supply agreement.</description>
+      <pubDate>Mon, 28 Apr 2026 09:00:00 +0000</pubDate>
+      <guid>https://rss.stub.invalid/article/2</guid>
+    </item>
+    <item>
+      <title>Regulation update on brake system standards</title>
+      <link>https://rss.stub.invalid/article/3</link>
+      <description>New regulation draft proposes stricter brake performance benchmarks.</description>
+      <pubDate>Mon, 28 Apr 2026 10:00:00 +0000</pubDate>
+      <guid>https://rss.stub.invalid/article/3</guid>
+    </item>
+  </channel>
+</rss>

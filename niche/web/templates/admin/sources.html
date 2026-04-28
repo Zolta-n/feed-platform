@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Sources — Admin — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:0.5rem;">Admin</h1>
+<div class="nav-links" style="margin-bottom:2rem; font-family:sans-serif; display:flex; gap:1rem; font-size:0.875rem;">
+  <a href="{{ url_for('admin.index') }}">Pipeline</a>
+  <a href="{{ url_for('admin.sources') }}" class="active">Sources</a>
+  <a href="{{ url_for('admin.users') }}">Users</a>
+  <a href="{{ url_for('admin.costs') }}">Costs</a>
+</div>
+
+<h2>Source health</h2>
+{% if sources %}
+<div class="card" style="padding:0;">
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Last OK</th>
+      <th>Last error</th>
+      <th>Failures</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for s in sources %}
+    <tr>
+      <td>
+        {{ s.name }}
+        {% if not s.enabled %}<span class="tag" style="margin-left:4px;">disabled</span>{% endif %}
+      </td>
+      <td><span class="tag">{{ s.source_type }}</span></td>
+      <td>{{ s.last_ok_at[:16] if s.last_ok_at else '—' }}</td>
+      <td>
+        {% if s.last_error_message %}
+          <span title="{{ s.last_error_message }}" style="cursor:help;">{{ s.last_error_message[:60] }}{% if s.last_error_message|length > 60 %}…{% endif %}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ s.consecutive_failures or 0 }}</td>
+      <td>
+        {% if s.is_flagged %}<span class="status-err">⚠ flagged</span>
+        {% else %}<span class="status-ok">✓ ok</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">No source health data yet.</div>
+{% endif %}
+{% endblock %}

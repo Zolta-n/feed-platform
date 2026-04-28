@@ -1,0 +1,28 @@
+{
+  "articles": [
+    {
+      "url": "https://gdelt.stub.invalid/article/1",
+      "title": "Global brake supplier consolidation accelerates",
+      "seendate": "20260428T080000Z",
+      "language": "English",
+      "domain": "gdelt.stub.invalid",
+      "sourcecountry": "Germany"
+    },
+    {
+      "url": "https://gdelt.stub.invalid/article/2",
+      "title": "Asian OEM adopts electromechanical braking platform",
+      "seendate": "20260428T090000Z",
+      "language": "English",
+      "domain": "gdelt.stub.invalid",
+      "sourcecountry": "Japan"
+    },
+    {
+      "url": "https://gdelt.stub.invalid/article/3",
+      "title": "EU funding round targets brake-by-wire startups",
+      "seendate": "20260428T100000Z",
+      "language": "English",
+      "domain": "gdelt.stub.invalid",
+      "sourcecountry": "Belgium"
+    }
+  ]
+}

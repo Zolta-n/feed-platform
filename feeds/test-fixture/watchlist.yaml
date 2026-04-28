@@ -1,0 +1,14 @@
+companies:
+  - id: acme-brake
+    name: "AcmeBrake"
+    value_chain_role: tier2peer
+    relationships: [competitor]
+    aliases: ["Acme Brake", "AcmeBrakeCo"]
+    boost: 1.5
+
+  - id: fake-tier1-co
+    name: "FakeTier1Co"
+    value_chain_role: tier1
+    relationships: [customer]
+    aliases: ["Fake Tier1", "FT1"]
+    boost: 2.0

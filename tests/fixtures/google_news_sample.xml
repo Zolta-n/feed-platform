@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Google News - test query</title>
+  <id>tag:google.com,2005:reader/user/00000000000000000000000000000000/state/com.google/alerts/00000000000000000</id>
+  <updated>2026-04-28T10:00:00Z</updated>
+  <entry>
+    <title>New EV braking system enters production</title>
+    <link href="https://gnews.stub.invalid/article/1"/>
+    <id>tag:gnews.stub.invalid,2026:article/1</id>
+    <published>2026-04-28T07:00:00Z</published>
+    <updated>2026-04-28T07:00:00Z</updated>
+    <summary>An OEM partner confirms production ramp-up for a new electromechanical braking unit.</summary>
+  </entry>
+  <entry>
+    <title>Autonomous braking patent filed</title>
+    <link href="https://gnews.stub.invalid/article/2"/>
+    <id>tag:gnews.stub.invalid,2026:article/2</id>
+    <published>2026-04-28T08:30:00Z</published>
+    <updated>2026-04-28T08:30:00Z</updated>
+    <summary>Patent filing reveals novel redundancy architecture for autonomous emergency braking.</summary>
+  </entry>
+  <entry>
+    <title>Market analysis: brake-by-wire adoption outlook</title>
+    <link href="https://gnews.stub.invalid/article/3"/>
+    <id>tag:gnews.stub.invalid,2026:article/3</id>
+    <published>2026-04-28T09:15:00Z</published>
+    <updated>2026-04-28T09:15:00Z</updated>
+    <summary>Analyst report forecasts 34% CAGR for brake-by-wire through 2030.</summary>
+  </entry>
+</feed>
