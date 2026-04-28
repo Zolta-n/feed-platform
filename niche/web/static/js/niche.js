@@ -54,7 +54,6 @@ document.addEventListener('click', async (e) => {
   btn.classList.toggle('saved', saved);
   const svgPath = btn.querySelector('svg path');
   if (svgPath) svgPath.setAttribute('fill', saved ? 'currentColor' : 'none');
-  btn.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = saved ? 'Saved' : 'Save'; });
   btn.title = saved ? 'Unsave' : 'Save for later';
   showToast(saved ? 'Saved for later' : 'Removed from saved');
 });
@@ -92,27 +91,103 @@ if (filterTabContainer) {
   });
 }
 
-// ── Theme swatches ────────────────────────────────────
+// ── Tweaks panel ──────────────────────────────────────
+(function () {
+  const panel    = document.getElementById('tweaks-panel');
+  const backdrop = document.getElementById('tweaks-backdrop');
+  const openBtn  = document.getElementById('tweaks-open');
+  const closeBtn = document.getElementById('tweaks-close');
+  if (!panel) return;
+
+  function openPanel() {
+    panel.classList.add('open');
+    backdrop.classList.add('open');
+  }
+  function closePanel() {
+    panel.classList.remove('open');
+    backdrop.classList.remove('open');
+  }
+
+  openBtn?.addEventListener('click', openPanel);
+  closeBtn?.addEventListener('click', closePanel);
+  backdrop?.addEventListener('click', closePanel);
+
+  // Density toggle
+  const savedDensity = localStorage.getItem('density') || 'comfortable';
+  if (savedDensity === 'compact') document.body.classList.add('compact');
+  panel.querySelectorAll('.tweaks-toggle[data-density]').forEach(btn => {
+    if (btn.dataset.density === savedDensity) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      const d = btn.dataset.density;
+      localStorage.setItem('density', d);
+      document.body.classList.toggle('compact', d === 'compact');
+      panel.querySelectorAll('.tweaks-toggle[data-density]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // Ticker toggle
+  const tickerToggle = document.getElementById('ticker-toggle');
+  const tickerWrap   = document.getElementById('breaking-ticker');
+  if (tickerToggle && tickerWrap) {
+    const tickerHidden = localStorage.getItem('ticker') === 'hidden';
+    if (tickerHidden) {
+      tickerWrap.style.display = 'none';
+      tickerToggle.checked = false;
+    }
+    tickerToggle.addEventListener('change', () => {
+      const show = tickerToggle.checked;
+      tickerWrap.style.display = show ? '' : 'none';
+      localStorage.setItem('ticker', show ? 'visible' : 'hidden');
+    });
+  }
+
+  // Accent color buttons (tweaks panel)
+  panel.querySelectorAll('.tweaks-color-btn[data-hex]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const hex   = btn.dataset.hex;
+      const color = btn.dataset.color;
+
+      // Live CSS update
+      document.documentElement.style.setProperty('--accent', hex);
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      document.documentElement.style.setProperty('--accent-rgb', `${r},${g},${b}`);
+      panel.querySelectorAll('.tweaks-color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Persist via AJAX
+      const res = await fetch('/preferences/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({ theme_color: color }),
+      });
+      if (res.ok) showToast('Theme updated');
+    });
+  });
+})();
+
+// ── Theme swatches (preferences page) ────────────────
 const swatchContainer = document.getElementById('theme-swatches');
 if (swatchContainer) {
   swatchContainer.addEventListener('click', async (e) => {
     const swatch = e.target.closest('.swatch[data-hex]');
     if (!swatch) return;
-    const hex = swatch.dataset.hex;
+    const hex   = swatch.dataset.hex;
     const color = swatch.dataset.color;
 
-    // Live CSS preview
     document.documentElement.style.setProperty('--accent', hex);
-    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
     document.documentElement.style.setProperty('--accent-rgb', `${r},${g},${b}`);
     swatchContainer.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
     swatch.classList.add('active');
 
-    // Persist immediately via AJAX — no form submit needed
-    const csrf = getCsrf();
     const res = await fetch('/preferences/theme', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
       body: JSON.stringify({ theme_color: color }),
     });
     if (res.ok) showToast('Theme updated');

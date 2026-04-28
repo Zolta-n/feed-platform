@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ feed_name }}{% endblock %}</title>
   <meta name="csrf-token" content="{{ csrf_token() }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/niche.css') }}">
   <style>:root { --accent: {{ accent_color or '#c0392b' }}; --accent-rgb: {{ accent_rgb or '192,57,43' }}; }</style>
   {% block head %}{% endblock %}
@@ -12,25 +15,33 @@
 <body>
   {% if breaking_items %}
   <div class="ticker-wrap" id="breaking-ticker">
-    <div class="ticker-label">⚡ Breaking</div>
+    <div class="ticker-label">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      BREAKING
+    </div>
     <div class="ticker-track">
-      {% for item in breaking_items %}
-      <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title_translated or item.title }}</a>
-      {% endfor %}
-      {% for item in breaking_items %}
-      <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title_translated or item.title }}</a>
-      {% endfor %}
+      {% for item in breaking_items %}<a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title_translated or item.title }}</a><span class="ticker-sep">·</span>{% endfor %}
+      {% for item in breaking_items %}<a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title_translated or item.title }}</a><span class="ticker-sep">·</span>{% endfor %}
     </div>
   </div>
   {% endif %}
 
   <nav>
-    <a class="nav-brand" href="{{ url_for('digest.index') }}"><span>{{ feed_name }}</span></a>
+    <a class="nav-brand" href="{{ url_for('digest.index') }}">
+      <svg class="nav-logo" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+      </svg>
+      <div class="nav-brand-text">
+        <span class="nav-title">{{ feed_name | upper }}</span>
+        <span class="nav-sub">{{ feed_tagline | upper }}</span>
+      </div>
+    </a>
     <div class="nav-links">
       <a href="{{ url_for('archive.index') }}">Archive</a>
       {% if current_user.is_authenticated %}
         <a href="{{ url_for('share.saved') }}">Saved</a>
-        <a href="{{ url_for('preferences.index') }}">Preferences</a>
         {% if current_user.is_admin %}
           <a href="{{ url_for('admin.index') }}">Admin</a>
         {% endif %}
@@ -39,6 +50,12 @@
         <a href="{{ url_for('auth.request_login') }}">Sign in</a>
       {% endif %}
     </div>
+    <button class="tweaks-btn" id="tweaks-open" title="Display settings" aria-label="Display settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
   </nav>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -50,6 +67,43 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Tweaks panel -->
+  <div class="tweaks-backdrop" id="tweaks-backdrop"></div>
+  <div class="tweaks-panel" id="tweaks-panel" role="dialog" aria-label="Display settings">
+    <div class="tweaks-header">
+      <span class="tweaks-title">TWEAKS</span>
+      <button class="tweaks-close" id="tweaks-close">✕</button>
+    </div>
+    <div class="tweaks-body">
+      <div class="tweaks-row">
+        <span class="tweaks-label">GRID DENSITY</span>
+        <div class="tweaks-toggle-group">
+          <button class="tweaks-toggle active" data-density="comfortable">COMFORTABLE</button>
+          <button class="tweaks-toggle" data-density="compact">COMPACT</button>
+        </div>
+      </div>
+      {% if breaking_items %}
+      <div class="tweaks-row">
+        <span class="tweaks-label">SHOW TICKER</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ticker-toggle" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      {% endif %}
+      <div class="tweaks-row">
+        <span class="tweaks-label">ACCENT COLOR</span>
+        <div class="tweaks-color-row">
+          <button class="tweaks-color-btn" data-color="red" data-hex="#c0392b" style="background:#c0392b">RED</button>
+          <button class="tweaks-color-btn" data-color="blue" data-hex="#2563eb" style="background:#2563eb">BLUE</button>
+          <button class="tweaks-color-btn" data-color="amber" data-hex="#d97706" style="background:#d97706">AMBER</button>
+          <button class="tweaks-color-btn" data-color="purple" data-hex="#7c3aed" style="background:#7c3aed">PURPLE</button>
+          <button class="tweaks-color-btn" data-color="teal" data-hex="#0d9488" style="background:#0d9488">TEAL</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="toast" id="toast"></div>
   <script src="{{ url_for('static', filename='js/niche.js') }}"></script>

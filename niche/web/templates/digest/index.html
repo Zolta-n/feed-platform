@@ -3,16 +3,18 @@
 {% block content %}
 
 <div class="digest-header">
-  <h1>{{ digest.date }}</h1>
-  <span class="meta">{{ digest.item_count }} articles &nbsp;·&nbsp; ~{{ "%.0f"|format(digest.total_read_time_min) }} min read</span>
+  <div>
+    <h1>{{ digest.date }}</h1>
+    <span class="digest-meta">{{ digest.item_count }} articles &nbsp;·&nbsp; ~{{ "%.0f"|format(digest.total_read_time_min) }} min read</span>
+  </div>
 </div>
 
 {% if nav_tabs %}
-<div class="filter-tabs" id="filter-tabs">
-  <button class="filter-tab active" data-topic="all">All</button>
+<div class="filter-tabs" id="filter-tabs" role="tablist">
+  <button class="filter-tab active" data-topic="all" role="tab">ALL</button>
   {% for tab in nav_tabs %}
     {% if tab.id != 'all' %}
-    <button class="filter-tab" data-topic="{{ tab.id }}">{{ tab.label }}</button>
+    <button class="filter-tab" data-topic="{{ tab.id }}" role="tab">{{ tab.label | upper }}</button>
     {% endif %}
   {% endfor %}
 </div>
@@ -21,91 +23,84 @@
 {% for cluster in clusters %}
 <div class="cluster-section" data-cluster="{{ loop.index }}">
   <div class="cluster-header">
-    <h2>{{ cluster.label }}</h2>
-    <div class="cluster-line"></div>
+    <span class="cluster-label">{{ cluster.label | upper }}</span>
+    <div class="cluster-rule"></div>
   </div>
 
+  <div class="cards-grid">
   {% for item in cluster.cards %}
   {% set is_saved = item.id in saved_ids %}
-  <div class="card {% if item.id in read_ids %}read{% endif %}"
-       data-item-id="{{ item.id }}"
-       data-topic="{{ item.topic_tag or '' }}"
-       style="animation-delay: {{ (loop.index0 * 0.05)|round(2) }}s">
+  <article class="card {% if item.id in read_ids %}read{% endif %}"
+           data-item-id="{{ item.id }}"
+           data-topic="{{ item.topic_tag or '' }}"
+           style="animation-delay:{{ (loop.index0 * 0.04)|round(2) }}s">
 
-    {# Thumbnail #}
-    <div class="card-img">
-      {% if item.image_url %}
-        <img src="{{ item.image_url }}" alt="" loading="lazy">
-      {% else %}
-        <div class="card-img-placeholder">
-          {% if item.item_type == 'breaking' %}⚡
-          {% elif item.item_type == 'analysis' %}📊
-          {% elif item.item_type == 'exclusive' %}★
-          {% else %}📰{% endif %}
-        </div>
-      {% endif %}
+    {% if item.image_url %}
+    <div class="card-hero">
+      <img src="{{ item.image_url }}" alt="" loading="lazy" onerror="this.closest('.card-hero').remove()">
     </div>
+    {% endif %}
 
-    {# Content #}
     <div class="card-body">
-      <div class="meta" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+      <div class="card-badges">
         {% if item.item_type %}
-          <span class="item-type-badge badge-{{ item.item_type }}">{{ item.item_type }}</span>
+          <span class="badge badge-{{ item.item_type }}">{{ item.item_type | upper }}</span>
         {% endif %}
-        {% if item.topic_tag %}<span class="tag tag-accent">{{ item.topic_tag }}</span>{% endif %}
-        {% if item.region_tag %}<span class="tag">{{ item.region_tag }}</span>{% endif %}
+        {% if item.topic_tag %}
+          <span class="card-topic">{{ item.topic_tag | upper }}</span>
+        {% endif %}
+        {% if item.region_tag %}
+          <span class="card-topic muted">{{ item.region_tag | upper }}</span>
+        {% endif %}
       </div>
 
-      <h3>
+      <h2 class="card-title">
         <a href="{{ url_for('digest.item_detail', item_id=item.id) }}"
-           class="item-link" data-item-id="{{ item.id }}"
-           style="color: var(--text);">
+           class="item-link" data-item-id="{{ item.id }}">
           {{ item.title_translated or item.title or '(no title)' }}
         </a>
-      </h3>
-
-      <div class="meta">
-        {{ item.source_name }}
-        {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
-        {% if item.read_time_min %} · {{ "%.0f"|format(item.read_time_min) }} min{% endif %}
-      </div>
+      </h2>
 
       {% if item.summary %}
-      <p class="summary-text">{{ item.summary }}</p>
+      <p class="card-summary">{{ item.summary | truncate(160, True, '…') }}</p>
       {% endif %}
 
       {% if item.why_it_matters %}
-      <p class="why-matters">{{ item.why_it_matters }}</p>
+      <p class="card-why">{{ item.why_it_matters }}</p>
       {% endif %}
 
-      <div class="card-actions">
-        <a href="{{ item.url }}" target="_blank" rel="noopener"
-           class="btn btn-ghost" style="font-size:0.78rem; padding:0.3rem 0.75rem;">
-          Read source ↗
-        </a>
-        <div class="thumbs">
-          <button class="thumb-btn" data-signal="up" data-item-id="{{ item.id }}" title="Useful">👍</button>
-          <button class="thumb-btn" data-signal="down" data-item-id="{{ item.id }}" title="Not useful">👎</button>
+      <div class="card-footer">
+        <div class="card-source">
+          <span class="source-avatar">{{ item.source_name[:2] | upper }}</span>
+          <span class="source-name">{{ item.source_name }}</span>
+          {% if item.published_at %}<span class="source-sep">·</span><span class="source-date">{{ item.published_at[:10] }}</span>{% endif %}
+          {% if item.read_time_min %}<span class="source-sep">·</span><span class="source-date">{{ "%.0f"|format(item.read_time_min) }} min</span>{% endif %}
         </div>
-        <button class="icon-btn save-btn {% if is_saved %}saved{% endif %}"
-                data-item-id="{{ item.id }}" title="{% if is_saved %}Unsave{% else %}Save for later{% endif %}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="{% if is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2.2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-          </svg>
-          {% if is_saved %}Saved{% else %}Save{% endif %}
-        </button>
-        <button class="icon-btn share-btn" data-item-id="{{ item.id }}" title="Copy shareable link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-          </svg>
-          Share
-        </button>
+        <div class="card-actions">
+          <a href="{{ item.url }}" target="_blank" rel="noopener" class="card-read-link">Read ↗</a>
+          <div class="thumbs">
+            <button class="thumb-btn" data-signal="up" data-item-id="{{ item.id }}" title="Useful">↑</button>
+            <button class="thumb-btn" data-signal="down" data-item-id="{{ item.id }}" title="Not useful">↓</button>
+          </div>
+          <button class="icon-btn save-btn {% if is_saved %}saved{% endif %}"
+                  data-item-id="{{ item.id }}" title="{% if is_saved %}Unsave{% else %}Save{% endif %}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="{% if is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+          <button class="icon-btn share-btn" data-item-id="{{ item.id }}" title="Copy link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </article>
   {% endfor %}
+  </div>
 </div>
 {% endfor %}
 
