@@ -76,7 +76,9 @@ def _strip_fence(text: str) -> str:
     text = text.strip()
     if text.startswith("```"):
         lines = text.splitlines()
-        start = 1
-        end = len(lines) - 1 if lines and lines[-1].strip() == "```" else len(lines)
-        text = "\n".join(lines[start:end]).strip()
+        # Find first closing fence after the opening line (model may append reasoning after it)
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == "```":
+                return "\n".join(lines[1:i]).strip()
+        text = "\n".join(lines[1:]).strip()
     return text
