@@ -406,6 +406,53 @@ class Repository:
             (feed_id, date),
         ).fetchone()
 
+    def get_recent_pool_items(self, feed_id: str, days: int = 2) -> list:
+        """Return classified non-duplicate items from the last N days as Item dataclasses.
+
+        Used by the pipeline to build a rolling digest pool so that today's new
+        articles merge with yesterday's classified content rather than replacing it.
+        """
+        from datetime import datetime, timezone, timedelta
+        from niche.core.models.types import Item
+        import json as _json
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        rows = self._conn.execute(
+            """SELECT * FROM items
+               WHERE feed_id=? AND is_duplicate=0 AND topic_tag IS NOT NULL
+                 AND fetched_at >= ?
+               ORDER BY relevance_score DESC
+               LIMIT 200""",
+            (feed_id, cutoff),
+        ).fetchall()
+
+        items: list[Item] = []
+        for r in rows:
+            try:
+                items.append(Item(
+                    id=r["id"], feed_id=r["feed_id"], url=r["url"],
+                    url_hash=r["url_hash"], title_hash=r["title_hash"],
+                    title=r["title"], title_translated=r["title_translated"],
+                    body_raw=r["body_raw"] or "", body_translated=r["body_translated"],
+                    summary=r["summary"], why_it_matters=r["why_it_matters"],
+                    source_id=r["source_id"], source_name=r["source_name"],
+                    source_language=r["source_language"],
+                    topic_tag=r["topic_tag"], item_type=r["item_type"],
+                    region_tag=r["region_tag"],
+                    company_tags=_json.loads(r["company_tags"] or "[]"),
+                    translation_failed=bool(r["translation_failed"]),
+                    translation_provider=r["translation_provider"],
+                    relevance_score=r["relevance_score"] or 0.0,
+                    published_at=None, fetched_at=datetime.fromisoformat(r["fetched_at"]),
+                    run_id=r["run_id"], word_count=r["word_count"] or 0,
+                    read_time_min=r["read_time_min"] or 0.0,
+                    is_duplicate=False, duplicate_of=None,
+                    image_url=r["image_url"],
+                ))
+            except Exception:
+                continue
+        return items
+
     def get_items_by_ids(self, ids: list[str]) -> list[sqlite3.Row]:
         if not ids:
             return []

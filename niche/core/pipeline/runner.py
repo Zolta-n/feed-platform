@@ -9,7 +9,7 @@ from niche.core.models.types import Digest, FeedBundle, Item
 from niche.core.models.repository import Repository
 from niche.core.pipeline.classify import classify
 from niche.core.pipeline.cluster import cluster
-from niche.core.pipeline.compose import compose
+from niche.core.pipeline.compose import _DIGEST_MIN_ITEMS, compose
 from niche.core.pipeline.dedup import dedup
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
@@ -151,15 +151,35 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         repo.update_items(ranked)
         results.append(StageResult("rank", len(summarized), len(ranked), time.monotonic() - t0))
 
+        # --- Build rolling pool for cluster/compose ---
+        # Merge today's new items with classified items from the past 2 days so
+        # that running the pipeline multiple times doesn't overwrite a rich digest
+        # with a thin one when the article pool is already depleted.
+        recent = repo.get_recent_pool_items(bundle.config.feed_id, days=2)
+        current_ids = {item.id for item in ranked}
+        pool = ranked + [item for item in recent if item.id not in current_ids]
+        pool.sort(key=lambda i: i.relevance_score, reverse=True)
+        logger.info("run_id=%s pool size: %d current + %d historical = %d",
+                    run_id, len(ranked), len(pool) - len(ranked), len(pool))
+
         # --- Cluster ---
         t0 = time.monotonic()
-        clusters = cluster(ranked, bundle, repo, run_id)
-        results.append(StageResult("cluster", len(ranked), len(clusters), time.monotonic() - t0))
+        clusters = cluster(pool, bundle, repo, run_id)
+        results.append(StageResult("cluster", len(pool), len(clusters), time.monotonic() - t0))
 
         # --- Compose ---
         t0 = time.monotonic()
-        digest: Digest = compose(ranked, clusters, bundle, run_id)
-        repo.insert_digest(digest)
+        digest: Digest = compose(pool, clusters, bundle, run_id)
+        # Only replace an existing good digest if the new one meets the minimum.
+        # This prevents a thin run from overwriting a richer previous digest.
+        prev = repo.get_latest_digest(bundle.config.feed_id)
+        if digest.item_count >= _DIGEST_MIN_ITEMS or prev is None:
+            repo.insert_digest(digest)
+        else:
+            logger.warning(
+                "run_id=%s digest skipped — only %d items (min %d); keeping previous digest",
+                run_id, digest.item_count, _DIGEST_MIN_ITEMS,
+            )
         results.append(StageResult("compose", len(ranked), digest.item_count, time.monotonic() - t0))
 
         finished_at = datetime.now(timezone.utc).isoformat()
