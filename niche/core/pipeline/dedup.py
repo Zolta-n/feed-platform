@@ -14,6 +14,7 @@ _TRACKING_PARAMS = frozenset([
 ])
 
 _FUZZY_THRESHOLD = 0.95
+_CROSS_LANG_THRESHOLD = 0.72
 
 
 def dedup(
@@ -84,10 +85,26 @@ def dedup(
     return items
 
 
-def _fuzzy_match(title: str, known_titles: list[str]) -> bool:
+def dedup_translated(items: list[Item]) -> list[Item]:
+    """Second-pass dedup on translated titles to catch cross-language near-duplicates."""
+    from dataclasses import replace as dc_replace
+    seen: list[str] = []
+    result = []
+    for item in items:
+        t = (item.title_translated or item.title or "").lower().strip()
+        if t and _fuzzy_match(t, seen, _CROSS_LANG_THRESHOLD):
+            item = dc_replace(item, is_duplicate=True)
+        else:
+            if t:
+                seen.append(t)
+        result.append(item)
+    return result
+
+
+def _fuzzy_match(title: str, known_titles: list[str], threshold: float = _FUZZY_THRESHOLD) -> bool:
     for known in known_titles:
         ratio = difflib.SequenceMatcher(None, title, known).ratio()
-        if ratio >= _FUZZY_THRESHOLD:
+        if ratio >= threshold:
             return True
     return False
 

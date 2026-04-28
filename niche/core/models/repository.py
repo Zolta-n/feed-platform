@@ -396,7 +396,7 @@ class Repository:
     def get_latest_digest(self, feed_id: str) -> sqlite3.Row | None:
         return self._conn.execute(
             """SELECT * FROM digests WHERE feed_id=? AND user_id IS NULL
-               ORDER BY date DESC LIMIT 1""",
+               ORDER BY date DESC, created_at DESC LIMIT 1""",
             (feed_id,),
         ).fetchone()
 

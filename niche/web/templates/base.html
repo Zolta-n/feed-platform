@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/niche.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/niche.css') }}?v={{ static_version }}">
   <style>:root { --accent: {{ accent_color or '#c0392b' }}; --accent-rgb: {{ accent_rgb or '192,57,43' }}; }</style>
   {% block head %}{% endblock %}
 </head>
@@ -106,6 +106,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="{{ url_for('static', filename='js/niche.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/niche.js') }}?v={{ static_version }}"></script>
 </body>
 </html>

@@ -15,11 +15,21 @@ csrf = CSRFProtect()
 login_manager = LoginManager()
 
 
+def _static_version() -> str:
+    import subprocess
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+    except Exception:
+        import time
+        return str(int(time.time()))
+
+
 def create_app(config: dict | None = None) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
     app.secret_key = os.environ.get("SESSION_SECRET") or "dev-secret-change-in-production"
     app.config["WTF_CSRF_ENABLED"] = True
+    app.config["STATIC_VERSION"] = _static_version()
 
     if config:
         app.config.update(config)
@@ -88,6 +98,7 @@ def create_app(config: dict | None = None) -> Flask:
             "accent_rgb": accent_rgb,
             "logo_path": bundle.config.logo_path,
             "breaking_items": breaking_items,
+            "static_version": app.config.get("STATIC_VERSION", "1"),
         }
 
     from niche.web.blueprints.digest import bp as digest_bp

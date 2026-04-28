@@ -10,7 +10,7 @@ from niche.core.models.repository import Repository
 from niche.core.pipeline.classify import classify
 from niche.core.pipeline.cluster import cluster
 from niche.core.pipeline.compose import _DIGEST_MIN_ITEMS, compose
-from niche.core.pipeline.dedup import dedup
+from niche.core.pipeline.dedup import dedup, dedup_translated
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
 from niche.core.pipeline.translate import translate
@@ -136,7 +136,12 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         # --- Translate ---
         t0 = time.monotonic()
         translated = translate(classified, bundle, repo, run_id)
+        translated = dedup_translated(translated)
+        cross_dupes = sum(1 for i in translated if i.is_duplicate)
+        if cross_dupes:
+            logger.info("run_id=%s cross-lang dedup removed %d near-duplicates", run_id, cross_dupes)
         repo.update_items(translated)
+        translated = [i for i in translated if not i.is_duplicate]
         results.append(StageResult("translate", len(classified), len(translated), time.monotonic() - t0))
 
         # --- Summarize ---
