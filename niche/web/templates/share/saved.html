@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Saved — {{ feed_name }}{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:1.5rem;">Saved articles</h1>
+
+{% if items %}
+  {% for item in items %}
+  <div class="card" data-item-id="{{ item.id }}">
+    <div class="card-img">
+      {% if item.image_url %}
+        <img src="{{ item.image_url }}" alt="" loading="lazy">
+      {% else %}
+        <div class="card-img-placeholder">📰</div>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      {% if item.item_type %}
+        <span class="item-type-badge badge-{{ item.item_type }}">{{ item.item_type }}</span>
+      {% endif %}
+      <h3><a href="{{ item.url }}" target="_blank" rel="noopener" style="color:var(--text);">{{ item.title_translated or item.title }}</a></h3>
+      <div class="meta">{{ item.source_name }}{% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}</div>
+      {% if item.summary %}<p class="summary-text">{{ item.summary }}</p>{% endif %}
+      <div class="card-actions">
+        <a href="{{ item.url }}" target="_blank" rel="noopener" class="btn btn-ghost" style="font-size:0.78rem;">Read source ↗</a>
+        <button class="icon-btn save-btn saved" data-item-id="{{ item.id }}" title="Remove from saved">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          Saved
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="empty-state">
+  <p>No saved articles yet.</p>
+  <p style="margin-top:0.5rem; font-size:0.9rem;">Click Save on any article to bookmark it.</p>
+</div>
+{% endif %}
+{% endblock %}

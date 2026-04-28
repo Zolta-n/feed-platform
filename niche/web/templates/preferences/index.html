@@ -3,12 +3,24 @@
 {% block content %}
 <h1 style="margin-bottom:2rem;">Preferences</h1>
 
-<form method="post">
+<form method="post" id="prefs-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="theme_color" value="{{ theme_color or 'red' }}">
+
+  <div class="card-plain" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; font-family:sans-serif;">Accent color</h3>
+    <div class="theme-swatches" id="theme-swatches">
+      <div class="swatch swatch-red{% if theme_color == 'red' or not theme_color %} active{% endif %}" data-color="red" data-hex="#c0392b" title="Red"></div>
+      <div class="swatch swatch-blue{% if theme_color == 'blue' %} active{% endif %}" data-color="blue" data-hex="#2563eb" title="Blue"></div>
+      <div class="swatch swatch-amber{% if theme_color == 'amber' %} active{% endif %}" data-color="amber" data-hex="#d97706" title="Amber"></div>
+      <div class="swatch swatch-purple{% if theme_color == 'purple' %} active{% endif %}" data-color="purple" data-hex="#7c3aed" title="Purple"></div>
+      <div class="swatch swatch-teal{% if theme_color == 'teal' %} active{% endif %}" data-color="teal" data-hex="#0d9488" title="Teal"></div>
+    </div>
+  </div>
 
   {% if topics %}
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin-bottom:1rem;">Topic weights</h2>
+  <div class="card-plain" style="margin-bottom:1.25rem;">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; font-family:sans-serif;">Topic weights</h3>
     <p class="meta" style="margin-bottom:1rem;">Set how much you care about each topic. Higher = appears more often.</p>
     {% for topic in topics %}
     <div class="form-group">
@@ -26,8 +38,8 @@
   {% endif %}
 
   {% if regions %}
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin-bottom:1rem;">Region weights</h2>
+  <div class="card-plain" style="margin-bottom:1.25rem;">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; font-family:sans-serif;">Region weights</h3>
     {% for region in regions %}
     <div class="form-group">
       <label for="region_{{ region.id }}">{{ region.label }}</label>
@@ -43,8 +55,8 @@
   </div>
   {% endif %}
 
-  <div class="card" style="margin-bottom:1.25rem;">
-    <h2 style="margin-bottom:1rem;">Keywords</h2>
+  <div class="card-plain" style="margin-bottom:1.25rem;">
+    <h3 style="margin-bottom:1rem; font-size:0.95rem; font-family:sans-serif;">Keywords</h3>
     <div class="form-group">
       <label for="keyword_blocks">Block words (comma-separated)</label>
       <input type="text" id="keyword_blocks" name="keyword_blocks"
