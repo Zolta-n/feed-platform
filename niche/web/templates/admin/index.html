@@ -2,7 +2,7 @@
 {% block title %}Admin — {{ feed_name }}{% endblock %}
 {% block content %}
 <h1 style="margin-bottom:0.5rem;">Admin</h1>
-<div class="nav-links" style="margin-bottom:2rem; font-family:sans-serif; display:flex; gap:1rem; font-size:0.875rem;">
+<div class="nav-links" style="margin-bottom:2rem; display:flex; gap:1rem; font-size:0.875rem;">
   <a href="{{ url_for('admin.index') }}" class="active">Pipeline</a>
   <a href="{{ url_for('admin.sources') }}">Sources</a>
   <a href="{{ url_for('admin.users') }}">Users</a>
@@ -11,40 +11,68 @@
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% for cat, msg in messages %}
-  <div class="card" style="background:{% if cat=='error' %}#3a1a1a{% else %}#1a2a3a{% endif %}; margin-bottom:1rem; font-family:sans-serif; font-size:0.875rem; color:{% if cat=='error' %}#f87171{% else %}#7dd3fc{% endif %};">{{ msg }}</div>
+  <div class="card-plain" style="background:{% if cat=='error' %}#3a1a1a{% else %}#1a2a3a{% endif %}; margin-bottom:1rem; font-size:0.875rem; color:{% if cat=='error' %}#f87171{% else %}#7dd3fc{% endif %};">{{ msg }}</div>
   {% endfor %}
 {% endwith %}
 
-<div style="display:flex; gap:0.75rem; margin-bottom:2rem;">
-  <form method="post" action="{{ url_for('admin.run_pipeline') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn-primary">▶ Run pipeline</button>
-  </form>
+<div style="display:flex; gap:0.75rem; margin-bottom:1.5rem; align-items:center; flex-wrap:wrap;">
+  <button id="run-pipeline-btn" class="btn btn-primary" type="button">▶ Run pipeline</button>
   <form method="post" action="{{ url_for('admin.send_digest') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="btn-primary" style="background:#1e3a2f;">✉ Send digest</button>
+    <button type="submit" class="btn btn-primary" style="background:#1e3a2f;">✉ Send digest</button>
   </form>
 </div>
 
+<!-- Pipeline progress panel (hidden until run starts) -->
+<div id="pipeline-progress" style="display:none; margin-bottom:1.75rem;">
+  <div class="card-plain" style="padding:1.25rem 1.5rem;">
+    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+      <span id="pipeline-spinner" style="font-size:1.1rem; animation:spin 1s linear infinite; display:inline-block;">⟳</span>
+      <span id="pipeline-status-text" style="font-size:0.88rem; font-weight:600; color:var(--text);">Starting pipeline…</span>
+      <span id="pipeline-run-id" style="font-size:0.72rem; color:var(--muted); margin-left:auto;"></span>
+    </div>
+
+    <!-- Stage strip -->
+    <div style="display:flex; gap:0; margin-bottom:1rem; border-radius:6px; overflow:hidden; border:1px solid var(--border);">
+      {% for id, label in [('fetch','FETCH'),('dedup','DEDUP'),('classify','CLASSIFY'),('translate','TRANSLATE'),('summarize','SUMMARIZE'),('rank','RANK'),('cluster','CLUSTER'),('compose','COMPOSE')] %}
+      <div class="pipeline-stage" data-stage="{{ id }}"
+           style="flex:1; padding:0.35rem 0; text-align:center; font-size:0.58rem; font-weight:800; letter-spacing:0.07em; color:var(--muted); background:var(--surface2); border-right:1px solid var(--border); transition:background 0.3s, color 0.3s;">
+        {{ label }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:flex; gap:2rem; font-size:0.8rem; color:var(--muted);">
+      <span>Fetched: <strong id="stat-fetched" style="color:var(--text);">—</strong></span>
+      <span>After dedup: <strong id="stat-dedup" style="color:var(--text);">—</strong></span>
+      <span>In digest: <strong id="stat-digest" style="color:var(--text);">—</strong></span>
+      <span>Cost: <strong id="stat-cost" style="color:var(--text);">—</strong></span>
+    </div>
+
+    <div id="pipeline-error" style="display:none; margin-top:0.75rem; font-size:0.82rem; color:var(--danger);"></div>
+  </div>
+</div>
+
 <h2>Recent pipeline runs</h2>
+<div id="runs-table-wrap">
 {% if runs %}
-<div class="card" style="padding:0;">
+<div class="card-plain" style="padding:0; overflow:hidden;">
 <table>
   <thead>
     <tr>
-      <th>Date</th>
+      <th>Started</th>
       <th>Status</th>
       <th>Fetched</th>
       <th>After dedup</th>
       <th>In digest</th>
       <th>Cost</th>
-      <th>Duration</th>
     </tr>
   </thead>
   <tbody>
   {% for run in runs %}
     <tr>
-      <td>{{ run.started_at[:16] }}</td>
+      <td style="font-size:0.82rem;">{{ run.started_at[:16] }}</td>
       <td>
         {% if run.status == 'complete' %}<span class="status-ok">✓ complete</span>
         {% elif run.status == 'running' %}<span style="color:var(--accent);">⟳ running</span>
@@ -54,15 +82,9 @@
       <td>{{ run.items_after_dedup }}</td>
       <td>{{ run.items_in_digest }}</td>
       <td>${{ "%.4f"|format(run.total_usd) }}</td>
-      <td>
-        {% if run.finished_at %}
-          {% set dur = (run.finished_at[:19] | length) %}
-          {{ run.finished_at[:16] }}
-        {% else %}—{% endif %}
-      </td>
     </tr>
     {% if run.error_message %}
-    <tr><td colspan="7" class="status-err" style="font-size:0.8rem; padding-top:0;">{{ run.error_message }}</td></tr>
+    <tr><td colspan="6" class="status-err" style="font-size:0.78rem; padding-top:0;">{{ run.error_message }}</td></tr>
     {% endif %}
   {% endfor %}
   </tbody>
@@ -71,4 +93,118 @@
 {% else %}
 <div class="empty-state">No pipeline runs yet.</div>
 {% endif %}
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.pipeline-stage.active { background: rgba(var(--accent-rgb),0.18) !important; color: var(--accent) !important; }
+.pipeline-stage.done   { background: rgba(52,211,153,0.12) !important; color: #34d399 !important; }
+.pipeline-stage.failed { background: rgba(224,82,82,0.15) !important; color: var(--danger) !important; }
+</style>
+
+<script>
+(function () {
+  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const STAGES = ['fetch','dedup','classify','translate','summarize','rank','cluster','compose'];
+
+  const btn         = document.getElementById('run-pipeline-btn');
+  const progressBox = document.getElementById('pipeline-progress');
+  const spinner     = document.getElementById('pipeline-spinner');
+  const statusText  = document.getElementById('pipeline-status-text');
+  const runIdLabel  = document.getElementById('pipeline-run-id');
+  const errBox      = document.getElementById('pipeline-error');
+  const stageEls    = document.querySelectorAll('.pipeline-stage');
+
+  let pollTimer = null;
+
+  function setStages(upTo) {
+    stageEls.forEach((el, i) => {
+      el.classList.remove('active', 'done', 'failed');
+      if (i < upTo)        el.classList.add('done');
+      else if (i === upTo) el.classList.add('active');
+    });
+  }
+
+  function inferStageIndex(data) {
+    // Rough inference based on what counts have been written so far
+    if (data.items_in_digest > 0)   return 7; // compose done
+    if (data.items_after_dedup > 0) return 2; // past dedup, somewhere in classify→cluster
+    if (data.items_fetched > 0)     return 1; // past fetch, in dedup
+    return 0;
+  }
+
+  function updateStats(data) {
+    document.getElementById('stat-fetched').textContent = data.items_fetched ?? '—';
+    document.getElementById('stat-dedup').textContent   = data.items_after_dedup ?? '—';
+    document.getElementById('stat-digest').textContent  = data.items_in_digest ?? '—';
+    document.getElementById('stat-cost').textContent    = data.total_usd != null
+      ? '$' + data.total_usd.toFixed(4) : '—';
+  }
+
+  async function poll(runId) {
+    try {
+      const res  = await fetch('/admin/run-status/' + runId);
+      const data = await res.json();
+      updateStats(data);
+
+      if (data.status === 'running') {
+        setStages(inferStageIndex(data));
+        statusText.textContent = 'Running…';
+        pollTimer = setTimeout(() => poll(runId), 2000);
+        return;
+      }
+
+      clearTimeout(pollTimer);
+      spinner.style.animation = 'none';
+
+      if (data.status === 'complete') {
+        spinner.textContent = '✓';
+        spinner.style.color = 'var(--success)';
+        stageEls.forEach(el => { el.classList.remove('active'); el.classList.add('done'); });
+        statusText.textContent = 'Pipeline complete — reloading…';
+        statusText.style.color = 'var(--success)';
+        updateStats(data);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        spinner.textContent = '✗';
+        spinner.style.color = 'var(--danger)';
+        stageEls.forEach(el => { el.classList.remove('active', 'done'); el.classList.add('failed'); });
+        statusText.textContent = 'Pipeline failed';
+        statusText.style.color = 'var(--danger)';
+        if (data.error_message) {
+          errBox.style.display = 'block';
+          errBox.textContent   = data.error_message;
+        }
+        btn.disabled = false;
+        btn.textContent = '▶ Run pipeline';
+      }
+    } catch {
+      pollTimer = setTimeout(() => poll(runId), 3000);
+    }
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '⟳ Starting…';
+
+    try {
+      const res  = await fetch('{{ url_for("admin.run_pipeline") }}', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+      });
+      const data = await res.json();
+
+      progressBox.style.display = 'block';
+      runIdLabel.textContent     = data.run_id.slice(0, 8) + '…';
+      statusText.textContent     = 'Fetching sources…';
+      setStages(0);
+      pollTimer = setTimeout(() => poll(data.run_id), 2000);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '▶ Run pipeline';
+      alert('Could not start pipeline: ' + err.message);
+    }
+  });
+})();
+</script>
 {% endblock %}

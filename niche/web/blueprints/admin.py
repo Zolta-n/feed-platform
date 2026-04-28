@@ -4,7 +4,7 @@ import threading
 import uuid
 from functools import wraps
 
-from flask import Blueprint, abort, current_app, flash, render_template, request, redirect, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, render_template, request, redirect, url_for
 from flask_login import current_user, login_required
 
 bp = Blueprint("admin", __name__)
@@ -81,6 +81,10 @@ def run_pipeline():
                 pass
 
     threading.Thread(target=_worker, daemon=True).start()
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"run_id": run_id})
+
     flash(f"Pipeline run {run_id[:8]}… started in background.", "info")
     return redirect(url_for("admin.index"))
 
@@ -103,6 +107,24 @@ def send_digest():
     sent = _send(bundle, repo, email_provider, app_url)
     flash(f"Digest sent to {sent} subscriber(s).", "info")
     return redirect(url_for("admin.index"))
+
+
+@bp.route("/run-status/<run_id>")
+@admin_required
+def run_status(run_id: str):
+    repo = current_app.config["REPO"]
+    run = repo.get_pipeline_run(run_id)
+    if not run:
+        return jsonify({"error": "not found"}), 404
+    return jsonify({
+        "status":            run["status"],
+        "items_fetched":     run["items_fetched"],
+        "items_after_dedup": run["items_after_dedup"],
+        "items_in_digest":   run["items_in_digest"],
+        "total_usd":         run["total_usd"],
+        "error_message":     run["error_message"],
+        "finished_at":       run["finished_at"],
+    })
 
 
 @bp.route("/costs")

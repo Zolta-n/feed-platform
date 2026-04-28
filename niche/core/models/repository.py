@@ -516,6 +516,11 @@ class Repository:
 
     # --- admin ---
 
+    def get_pipeline_run(self, run_id: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM pipeline_runs WHERE id=?", (run_id,)
+        ).fetchone()
+
     def get_pipeline_runs(self, feed_id: str, limit: int = 7) -> list[sqlite3.Row]:
         return self._conn.execute(
             "SELECT * FROM pipeline_runs WHERE feed_id=? ORDER BY started_at DESC LIMIT ?",
