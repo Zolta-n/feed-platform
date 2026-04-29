@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 import uuid
 from functools import wraps
 
@@ -66,31 +65,32 @@ def delete_user(user_id: str):
 @bp.route("/run", methods=["POST"])
 @admin_required
 def run_pipeline():
-    from niche.core.pipeline.runner import run_pipeline as _run
+    import subprocess, sys
 
     app = current_app._get_current_object()
     bundle = app.config["BUNDLE"]
     db_path = app.config.get("DB_PATH")
+    feed_dir = app.config.get("FEED_DIR") or bundle.feed_dir
     run_id = uuid.uuid4().hex
 
-    def _worker():
-        # Own connection so mid-run commits are immediately visible to pollers.
-        from niche.core.models.repository import Repository as _Repo
-        worker_repo = _Repo(db_path) if db_path else app.config["REPO"]
-        try:
-            _run(bundle, worker_repo, run_id)
-        except Exception:
-            pass
-        finally:
-            if db_path:
-                worker_repo.close()
+    import os
+    cli_path = os.path.join(os.path.dirname(app.root_path), "cli.py")
+    cmd = [
+        sys.executable,
+        cli_path,
+        "pipeline", "run",
+        "--feed-dir", feed_dir,
+        "--run-id", run_id,
+    ]
+    if db_path:
+        cmd += ["--db-path", db_path]
 
     try:
-        threading.Thread(target=_worker, daemon=True).start()
-    except RuntimeError as exc:
+        subprocess.Popen(cmd, close_fds=True)
+    except Exception as exc:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"error": f"{exc} — run the pipeline from the Bash console or PA Tasks instead."}), 500
-        flash("Cannot start background thread in this environment. Use the Bash console: python cli.py pipeline run --feed-dir feeds/brake-by-wire", "error")
+            return jsonify({"error": str(exc)}), 500
+        flash(f"Could not start pipeline: {exc}", "error")
         return redirect(url_for("admin.index"))
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":

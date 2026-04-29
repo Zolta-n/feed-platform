@@ -235,8 +235,8 @@ class TestAdminTriggers:
     def test_run_pipeline_starts_and_redirects(self, client, app, admin_user):
         from unittest.mock import patch
         _login(client, app, admin_user)
-        with patch("niche.web.blueprints.admin.threading.Thread") as mock_thread:
-            mock_thread.return_value.start = lambda: None
+        with patch("subprocess.Popen") as mock_popen:
+            mock_popen.return_value = None
             resp = client.post("/admin/run", follow_redirects=False)
         assert resp.status_code == 302
         assert "/admin" in resp.headers["Location"]

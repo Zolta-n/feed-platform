@@ -63,12 +63,13 @@ def pipeline():
 @pipeline.command("run")
 @click.option("--feed-dir", required=True, help="Path to feed bundle directory.")
 @click.option("--db-path", default=None, help="Path to SQLite database.")
-def pipeline_run(feed_dir: str, db_path: str | None):
+@click.option("--run-id", default=None, help="Reuse an existing run ID (set by admin UI).")
+def pipeline_run(feed_dir: str, db_path: str | None, run_id: str | None):
     """Run the full pipeline for a feed bundle."""
     from niche.core.pipeline.runner import run_pipeline
 
     bundle, repo = _load(feed_dir, db_path)
-    run_id = str(uuid.uuid4())
+    run_id = run_id or str(uuid.uuid4())
     click.echo(f"Starting pipeline run_id={run_id} feed={bundle.config.feed_id}")
 
     try:
