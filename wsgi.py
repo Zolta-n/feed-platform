@@ -30,7 +30,7 @@ application = create_app({
     "REPO": _repo,
     "DB_PATH": _db_path,
     "FEED_DIR": _feed_dir,
-    "PYTHON_EXECUTABLE": sys.executable,
+    "PYTHON_EXECUTABLE": os.path.join(sys.prefix, "bin", "python3"),
     "BUNDLE": _bundle,
     "APP_URL": os.environ.get("APP_URL", "http://localhost:5000"),
     "APPROVAL_SECRET": os.environ.get("APPROVAL_SECRET", "dev-approval-secret"),
