@@ -73,10 +73,8 @@ def run_pipeline():
     feed_dir = app.config.get("FEED_DIR") or bundle.feed_dir
     run_id = uuid.uuid4().hex
 
-    # Prefer virtualenv Python (sys.prefix/bin/python3) over sys.executable,
-    # which may point to the system Python under uWSGI.
-    venv_python = os.path.join(sys.prefix, "bin", "python3")
-    python = venv_python if os.path.exists(venv_python) else sys.executable
+    # Use the Python captured at WSGI startup — guaranteed to be the virtualenv Python.
+    python = app.config.get("PYTHON_EXECUTABLE") or sys.executable
 
     cli_path = os.path.join(os.path.dirname(os.path.dirname(app.root_path)), "cli.py")
     cmd = [

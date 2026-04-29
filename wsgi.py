@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -29,6 +30,7 @@ application = create_app({
     "REPO": _repo,
     "DB_PATH": _db_path,
     "FEED_DIR": _feed_dir,
+    "PYTHON_EXECUTABLE": sys.executable,
     "BUNDLE": _bundle,
     "APP_URL": os.environ.get("APP_URL", "http://localhost:5000"),
     "APPROVAL_SECRET": os.environ.get("APPROVAL_SECRET", "dev-approval-secret"),
