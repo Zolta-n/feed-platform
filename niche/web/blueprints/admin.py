@@ -74,7 +74,7 @@ def run_pipeline():
     run_id = uuid.uuid4().hex
 
     import os
-    cli_path = os.path.join(os.path.dirname(app.root_path), "cli.py")
+    cli_path = os.path.join(os.path.dirname(os.path.dirname(app.root_path)), "cli.py")
     cmd = [
         sys.executable,
         cli_path,
