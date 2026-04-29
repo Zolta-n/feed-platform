@@ -91,8 +91,10 @@ def run_pipeline():
     env = _os.environ.copy()
     env["PYTHONPATH"] = _os.path.dirname(_os.path.dirname(app.root_path))
 
+    log_path = _os.path.join(_os.path.dirname(_os.path.dirname(app.root_path)), "pipeline_subprocess.log")
     try:
-        subprocess.Popen(cmd, close_fds=True, env=env)
+        with open(log_path, "a") as log_f:
+            subprocess.Popen(cmd, close_fds=True, env=env, stdout=log_f, stderr=log_f)
     except Exception as exc:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"error": str(exc)}), 500
