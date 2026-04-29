@@ -85,7 +85,13 @@ def run_pipeline():
             if db_path:
                 worker_repo.close()
 
-    threading.Thread(target=_worker, daemon=True).start()
+    try:
+        threading.Thread(target=_worker, daemon=True).start()
+    except RuntimeError as exc:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"error": f"{exc} — run the pipeline from the Bash console or PA Tasks instead."}), 500
+        flash("Cannot start background thread in this environment. Use the Bash console: python cli.py pipeline run --feed-dir feeds/brake-by-wire", "error")
+        return redirect(url_for("admin.index"))
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"run_id": run_id})
