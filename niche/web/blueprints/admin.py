@@ -85,8 +85,12 @@ def run_pipeline():
     if db_path:
         cmd += ["--db-path", db_path]
 
+    import os as _os
+    env = _os.environ.copy()
+    env["PYTHONPATH"] = _os.path.dirname(_os.path.dirname(app.root_path))
+
     try:
-        subprocess.Popen(cmd, close_fds=True)
+        subprocess.Popen(cmd, close_fds=True, env=env)
     except Exception as exc:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"error": str(exc)}), 500
