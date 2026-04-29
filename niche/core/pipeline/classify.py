@@ -64,7 +64,7 @@ def _classify_llm(
         topic, topic_usage = classifier.classify_topic(item, bundle)
         item_type, type_usage = classifier.classify_item_type(item, bundle)
         region = _classify_region(item, bundle)
-        companies = _tag_companies(item, bundle)
+        companies = _tag_companies(item, bundle, repo)
 
         if repo and run_id:
             record_call(
@@ -113,9 +113,22 @@ def _classify_region(item: Item, bundle: FeedBundle) -> str | None:
     return None
 
 
-def _tag_companies(item: Item, bundle: FeedBundle) -> list[str]:
+def _tag_companies(item: Item, bundle: FeedBundle, repo=None) -> list[str]:
+    import json as _json
     text = f"{item.title} {item.body_raw}".lower()
     tags: list[str] = []
+    if repo:
+        try:
+            db_entries = repo.get_watchlist_entries(item.feed_id)
+            for e in db_entries:
+                aliases = _json.loads(e["aliases"] or "[]")
+                names = [e["name"]] + aliases
+                if any(n.lower() in text for n in names):
+                    tags.append(e["id"])
+            return tags
+        except Exception:
+            pass
+    # Fallback to bundle companies (tests / no repo)
     for company in bundle.companies:
         names = [company.name] + list(company.aliases)
         if any(n.lower() in text for n in names):

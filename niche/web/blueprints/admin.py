@@ -69,16 +69,21 @@ def run_pipeline():
     from niche.core.pipeline.runner import run_pipeline as _run
 
     app = current_app._get_current_object()
-    repo = app.config["REPO"]
     bundle = app.config["BUNDLE"]
+    db_path = app.config.get("DB_PATH")
     run_id = uuid.uuid4().hex
 
     def _worker():
-        with app.app_context():
-            try:
-                _run(bundle, repo, run_id)
-            except Exception:
-                pass
+        # Own connection so mid-run commits are immediately visible to pollers.
+        from niche.core.models.repository import Repository as _Repo
+        worker_repo = _Repo(db_path) if db_path else app.config["REPO"]
+        try:
+            _run(bundle, worker_repo, run_id)
+        except Exception:
+            pass
+        finally:
+            if db_path:
+                worker_repo.close()
 
     threading.Thread(target=_worker, daemon=True).start()
 
@@ -118,6 +123,7 @@ def run_status(run_id: str):
         return jsonify({"error": "not found"}), 404
     return jsonify({
         "status":            run["status"],
+        "current_stage":     run["current_stage"],
         "items_fetched":     run["items_fetched"],
         "items_after_dedup": run["items_after_dedup"],
         "items_in_digest":   run["items_in_digest"],
@@ -136,3 +142,140 @@ def costs():
     summary = repo.get_llm_costs_summary(bundle.config.feed_id, days=days)
     total_usd = sum(r["usd"] for r in summary)
     return render_template("admin/costs.html", summary=summary, total_usd=total_usd, days=days)
+
+
+@bp.route("/schedule", methods=["GET", "POST"])
+@admin_required
+def schedule():
+    app = current_app._get_current_object()
+    repo = app.config["REPO"]
+    bundle = app.config["BUNDLE"]
+    feed_id = bundle.config.feed_id
+
+    if request.method == "POST":
+        new_time = (request.json or request.form).get("run_time", "").strip()
+        # Validate HH:MM format
+        try:
+            h, m = new_time.split(":")
+            assert 0 <= int(h) <= 23 and 0 <= int(m) <= 59
+        except Exception:
+            return jsonify({"error": "Invalid time — use HH:MM (24h)"}), 400
+
+        repo.set_app_config(feed_id, "scheduler_run_time", new_time)
+
+        # Reschedule the live APScheduler job if scheduler is running
+        scheduler = app.config.get("SCHEDULER")
+        if scheduler and scheduler.running:
+            from apscheduler.triggers.cron import CronTrigger
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(bundle.config.timezone)
+            try:
+                scheduler.reschedule_job(
+                    "daily_pipeline",
+                    trigger=CronTrigger(hour=int(h), minute=int(m), timezone=tz),
+                )
+            except Exception as exc:
+                return jsonify({"error": f"Saved but reschedule failed: {exc}"}), 500
+
+        return jsonify({"ok": True, "run_time": new_time})
+
+    # GET — return current state
+    run_time = repo.get_app_config(feed_id, "scheduler_run_time") or bundle.config.daily_run_time
+    scheduler = app.config.get("SCHEDULER")
+    next_run = None
+    scheduler_running = False
+    if scheduler and scheduler.running:
+        scheduler_running = True
+        job = scheduler.get_job("daily_pipeline")
+        if job and job.next_run_time:
+            next_run = job.next_run_time.isoformat()
+    return jsonify({
+        "run_time": run_time,
+        "timezone": bundle.config.timezone,
+        "next_run": next_run,
+        "scheduler_running": scheduler_running,
+    })
+
+
+# ── Watchlist ──────────────────────────────────────────────────────────────────
+
+@bp.route("/watchlist")
+@admin_required
+def watchlist():
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    entries = repo.get_watchlist_entries(bundle.config.feed_id, enabled_only=False)
+    import json as _json
+    rows = []
+    for e in entries:
+        rows.append({
+            "id": e["id"],
+            "entry_type": e["entry_type"],
+            "name": e["name"],
+            "aliases": ", ".join(_json.loads(e["aliases"] or "[]")),
+            "boost": e["boost"],
+            "role": e["role"] or "",
+            "notes": e["notes"] or "",
+            "enabled": bool(e["enabled"]),
+        })
+    return render_template("admin/watchlist.html", entries=rows)
+
+
+@bp.route("/watchlist/add", methods=["POST"])
+@admin_required
+def watchlist_add():
+    import json as _json, re
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    data = request.form
+    name = data.get("name", "").strip()
+    if not name:
+        flash("Name is required.", "error")
+        return redirect(url_for("admin.watchlist"))
+    entry_id = re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-")
+    aliases_raw = data.get("aliases", "")
+    aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
+    repo.upsert_watchlist_entry(bundle.config.feed_id, {
+        "id": entry_id,
+        "name": name,
+        "entry_type": data.get("entry_type", "company"),
+        "aliases": _json.dumps(aliases),
+        "boost": float(data.get("boost", 1.5)),
+        "role": data.get("role", ""),
+        "notes": data.get("notes", ""),
+        "enabled": 1,
+    })
+    flash(f"Added '{name}' to watchlist.", "info")
+    return redirect(url_for("admin.watchlist"))
+
+
+@bp.route("/watchlist/<entry_id>/edit", methods=["POST"])
+@admin_required
+def watchlist_edit(entry_id: str):
+    import json as _json
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    data = request.form
+    aliases_raw = data.get("aliases", "")
+    aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
+    repo.upsert_watchlist_entry(bundle.config.feed_id, {
+        "id": entry_id,
+        "name": data.get("name", entry_id),
+        "entry_type": data.get("entry_type", "company"),
+        "aliases": _json.dumps(aliases),
+        "boost": float(data.get("boost", 1.5)),
+        "role": data.get("role", ""),
+        "notes": data.get("notes", ""),
+        "enabled": int(data.get("enabled", "1")),
+    })
+    return jsonify({"ok": True})
+
+
+@bp.route("/watchlist/<entry_id>/delete", methods=["POST"])
+@admin_required
+def watchlist_delete(entry_id: str):
+    repo = current_app.config["REPO"]
+    bundle = current_app.config["BUNDLE"]
+    repo.delete_watchlist_entry(bundle.config.feed_id, entry_id)
+    flash("Entry removed from watchlist.", "info")
+    return redirect(url_for("admin.watchlist"))

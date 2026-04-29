@@ -173,12 +173,35 @@ CREATE TABLE IF NOT EXISTS source_health (
     consecutive_failures INTEGER NOT NULL DEFAULT 0,
     is_flagged INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS app_config (
+    key        TEXT NOT NULL,
+    feed_id    TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (key, feed_id)
+);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+    id          TEXT NOT NULL,
+    feed_id     TEXT NOT NULL,
+    entry_type  TEXT NOT NULL DEFAULT 'company',
+    name        TEXT NOT NULL,
+    aliases     TEXT NOT NULL DEFAULT '[]',
+    boost       REAL NOT NULL DEFAULT 1.5,
+    role        TEXT,
+    notes       TEXT,
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (id, feed_id)
+);
 """
 
 
 _MIGRATIONS = [
     "ALTER TABLE items ADD COLUMN image_url TEXT",
     "ALTER TABLE preferences ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'red'",
+    "ALTER TABLE pipeline_runs ADD COLUMN current_stage TEXT",
 ]
 
 

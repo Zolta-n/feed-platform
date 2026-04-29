@@ -20,7 +20,14 @@ def rank(
 
     source_weight_map = {s.id: s.source_weight for s in bundle.sources}
     topic_weight_map = {t.id: t.weight for t in bundle.taxonomy.topics}
-    company_boost_map = {c.id: c.boost for c in bundle.companies}
+    if repo:
+        try:
+            db_entries = repo.get_watchlist_entries(bundle.config.feed_id)
+            company_boost_map = {e["id"]: e["boost"] for e in db_entries}
+        except Exception:
+            company_boost_map = {c.id: c.boost for c in bundle.companies}
+    else:
+        company_boost_map = {c.id: c.boost for c in bundle.companies}
 
     ranked: list[Item] = []
     for item in items:

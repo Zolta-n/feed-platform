@@ -42,7 +42,11 @@ def request_login():
         user_row = repo.get_user_by_email(email)
         if not user_row:
             user_id = repo.create_user(email, bundle.config.feed_id)
-            _send_approval_request(email, user_id, bundle, repo)
+            if current_app.config.get("EMAIL_PROVIDER"):
+                _send_approval_request(email, user_id, bundle, repo)
+            else:
+                # Dev mode: auto-approve new users so the login flow isn't blocked
+                repo.approve_user(user_id)
         else:
             if not user_row["is_approved"]:
                 return render_template("auth/magic_link_sent.html", pending=True)
@@ -51,8 +55,15 @@ def request_login():
         token = repo.create_magic_link_token(email, expires_at)
         app_url = current_app.config.get("APP_URL", request.host_url.rstrip("/"))
         link = make_login_link(token, app_url)
-        _send_magic_link(email, link, bundle)
 
+        # Dev mode: no email provider → redirect directly to the verify URL
+        if not current_app.config.get("EMAIL_PROVIDER"):
+            logger.warning("DEV MODE — no email provider, redirecting %s directly", email)
+            from urllib.parse import urlparse
+            parsed = urlparse(link)
+            return redirect(f"{parsed.path}?{parsed.query}")
+
+        _send_magic_link(email, link, bundle)
         return render_template("auth/magic_link_sent.html", pending=False)
 
     return render_template("auth/request.html")
@@ -116,6 +127,7 @@ def unsubscribe(token: str):
 def _send_magic_link(email: str, link: str, bundle) -> None:
     provider = current_app.config.get("EMAIL_PROVIDER")
     if not provider:
+        logger.warning("DEV MODE — no email provider. Magic link for %s:\n%s", email, link)
         return
     html = render_template(
         "email/magic_link.html",

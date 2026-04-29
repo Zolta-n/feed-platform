@@ -53,6 +53,19 @@ class Repository:
         )
         self._conn.commit()
 
+    def patch_pipeline_run(self, run_id: str, **fields) -> None:
+        """Partial mid-run update — only writes the supplied columns."""
+        allowed = {"items_fetched", "items_after_dedup", "items_in_digest", "total_usd", "status", "current_stage"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k}=?" for k in updates)
+        self._conn.execute(
+            f"UPDATE pipeline_runs SET {set_clause} WHERE id=?",
+            (*updates.values(), run_id),
+        )
+        self._conn.commit()
+
     # --- sources ---
 
     def upsert_source(self, source_dict: dict) -> None:
@@ -630,6 +643,88 @@ class Repository:
         )
         self._conn.commit()
         return cur.rowcount
+
+    # --- app config ---
+
+    def get_app_config(self, feed_id: str, key: str, default: str | None = None) -> str | None:
+        row = self._conn.execute(
+            "SELECT value FROM app_config WHERE feed_id=? AND key=?", (feed_id, key)
+        ).fetchone()
+        return row["value"] if row else default
+
+    def set_app_config(self, feed_id: str, key: str, value: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO app_config (key, feed_id, value, updated_at) VALUES (?,?,?,?)
+               ON CONFLICT(key, feed_id) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at""",
+            (key, feed_id, value, now),
+        )
+        self._conn.commit()
+
+    # --- watchlist ---
+
+    def get_watchlist_entries(self, feed_id: str, enabled_only: bool = True) -> list:
+        q = "SELECT * FROM watchlist WHERE feed_id=?"
+        params: list = [feed_id]
+        if enabled_only:
+            q += " AND enabled=1"
+        q += " ORDER BY entry_type, name"
+        return self._conn.execute(q, params).fetchall()
+
+    def upsert_watchlist_entry(self, feed_id: str, entry: dict) -> None:
+        import json as _json
+        now = datetime.now(timezone.utc).isoformat()
+        aliases = entry.get("aliases", [])
+        if isinstance(aliases, list):
+            aliases = _json.dumps(aliases)
+        self._conn.execute(
+            """INSERT INTO watchlist (id, feed_id, entry_type, name, aliases, boost, role, notes, enabled, created_at)
+               VALUES (:id, :feed_id, :entry_type, :name, :aliases, :boost, :role, :notes, :enabled, :created_at)
+               ON CONFLICT(id, feed_id) DO UPDATE SET
+                 name=excluded.name, aliases=excluded.aliases, boost=excluded.boost,
+                 role=excluded.role, notes=excluded.notes, enabled=excluded.enabled""",
+            {
+                "id": entry["id"],
+                "feed_id": feed_id,
+                "entry_type": entry.get("entry_type", "company"),
+                "name": entry["name"],
+                "aliases": aliases,
+                "boost": float(entry.get("boost", 1.5)),
+                "role": entry.get("role") or entry.get("value_chain_role"),
+                "notes": entry.get("notes"),
+                "enabled": int(entry.get("enabled", 1)),
+                "created_at": entry.get("created_at", now),
+            },
+        )
+        self._conn.commit()
+
+    def delete_watchlist_entry(self, feed_id: str, entry_id: str) -> None:
+        self._conn.execute(
+            "DELETE FROM watchlist WHERE id=? AND feed_id=?", (entry_id, feed_id)
+        )
+        self._conn.commit()
+
+    def seed_watchlist_from_bundle(self, feed_id: str, companies) -> None:
+        """Populate watchlist from bundle companies if the table is empty for this feed."""
+        import json as _json
+        existing = self._conn.execute(
+            "SELECT COUNT(*) FROM watchlist WHERE feed_id=?", (feed_id,)
+        ).fetchone()[0]
+        if existing:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        for c in companies:
+            self._conn.execute(
+                """INSERT OR IGNORE INTO watchlist
+                   (id, feed_id, entry_type, name, aliases, boost, role, notes, enabled, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    c.id, feed_id, "company", c.name,
+                    _json.dumps(list(c.aliases)),
+                    c.boost, c.value_chain_role, None, 1, now,
+                ),
+            )
+        self._conn.commit()
 
     # --- helpers ---
 

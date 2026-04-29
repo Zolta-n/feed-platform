@@ -7,6 +7,7 @@
   <a href="{{ url_for('admin.sources') }}">Sources</a>
   <a href="{{ url_for('admin.users') }}">Users</a>
   <a href="{{ url_for('admin.costs') }}">Costs</a>
+  <a href="{{ url_for('admin.watchlist') }}">Watchlist</a>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -51,6 +52,21 @@
     </div>
 
     <div id="pipeline-error" style="display:none; margin-top:0.75rem; font-size:0.82rem; color:var(--danger);"></div>
+  </div>
+</div>
+
+<!-- Schedule panel -->
+<div class="card-plain" style="padding:1.25rem 1.5rem; margin-bottom:1.75rem;">
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <span style="font-size:0.78rem; font-weight:700; letter-spacing:0.08em; color:var(--muted);">SCHEDULE</span>
+    <span id="sched-status" style="font-size:0.82rem; color:var(--muted);">loading…</span>
+    <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto;">
+      <label style="font-size:0.82rem; color:var(--muted);">Run time</label>
+      <input id="sched-time" type="time" value="05:30"
+             style="background:var(--surface2); border:1px solid var(--border); border-radius:6px;
+                    color:var(--text); padding:0.3rem 0.6rem; font-size:0.88rem;">
+      <button id="sched-save" class="btn btn-primary" style="padding:0.3rem 0.9rem; font-size:0.82rem;">Save</button>
+    </div>
   </div>
 </div>
 
@@ -122,14 +138,15 @@
       el.classList.remove('active', 'done', 'failed');
       if (i < upTo)        el.classList.add('done');
       else if (i === upTo) el.classList.add('active');
+      // upTo > last index → all done
     });
   }
 
+  const STAGE_INDEX = {fetch:0, dedup:1, classify:2, translate:3, summarize:4, rank:5, cluster:6, compose:7};
   function inferStageIndex(data) {
-    // Rough inference based on what counts have been written so far
-    if (data.items_in_digest > 0)   return 7; // compose done
-    if (data.items_after_dedup > 0) return 2; // past dedup, somewhere in classify→cluster
-    if (data.items_fetched > 0)     return 1; // past fetch, in dedup
+    if (data.items_in_digest > 0) return 8; // past compose — mark all done
+    if (data.current_stage)       return STAGE_INDEX[data.current_stage] ?? 0;
+    if (data.items_fetched > 0)   return 1; // fallback: fetch done, in dedup
     return 0;
   }
 
@@ -205,6 +222,49 @@
       alert('Could not start pipeline: ' + err.message);
     }
   });
+})();
+
+// ── Schedule panel ────────────────────────────────────────────────────────────
+(async function () {
+  const statusEl = document.getElementById('sched-status');
+  const timeEl   = document.getElementById('sched-time');
+  const saveBtn  = document.getElementById('sched-save');
+  if (!statusEl) return;
+
+  async function loadSchedule() {
+    try {
+      const res  = await fetch('{{ url_for("admin.schedule") }}');
+      const data = await res.json();
+      timeEl.value = data.run_time || '05:30';
+      if (data.scheduler_running && data.next_run) {
+        const d = new Date(data.next_run);
+        statusEl.textContent = `Next run: ${d.toLocaleString()} (${data.timezone})`;
+        statusEl.style.color = 'var(--success)';
+      } else if (data.scheduler_running) {
+        statusEl.textContent = `Scheduler running · ${data.timezone}`;
+        statusEl.style.color = 'var(--success)';
+      } else {
+        statusEl.textContent = 'Scheduler disabled (SCHEDULER_ENABLED=false)';
+        statusEl.style.color = 'var(--muted)';
+      }
+    } catch { statusEl.textContent = 'Could not load schedule'; }
+  }
+
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    try {
+      const res  = await fetch('{{ url_for("admin.schedule") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ run_time: timeEl.value }),
+      });
+      const data = await res.json();
+      if (data.ok) { await loadSchedule(); }
+      else { alert(data.error || 'Save failed'); }
+    } finally { saveBtn.disabled = false; }
+  });
+
+  await loadSchedule();
 })();
 </script>
 {% endblock %}

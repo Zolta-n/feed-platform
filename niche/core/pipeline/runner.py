@@ -103,6 +103,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
             raw_items.extend(fetched)
             logger.info("run_id=%s source=%s fetched=%d", run_id, source.source_id, len(fetched))
         results.append(StageResult("fetch", 0, len(raw_items), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, items_fetched=len(raw_items), current_stage="dedup")
 
         # --- Dedup ---
         t0 = time.monotonic()
@@ -118,6 +119,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         non_dupes = [i for i in items if not i.is_duplicate]
         logger.info("run_id=%s dedup in=%d out=%d dupes=%d", run_id, len(items), len(non_dupes), len(items) - len(non_dupes))
         results.append(StageResult("dedup", len(raw_items), len(non_dupes), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, items_after_dedup=len(non_dupes), current_stage="classify")
 
         # Cap items sent to LLM stages to bound cost and latency per run.
         # Uses a round-robin across sources weighted by source_weight so no
@@ -132,6 +134,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         repo.update_items(classified)
         logger.info("run_id=%s classify out=%d", run_id, len(classified))
         results.append(StageResult("classify", len(non_dupes), len(classified), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, current_stage="translate")
 
         # --- Translate ---
         t0 = time.monotonic()
@@ -143,27 +146,51 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         repo.update_items(translated)
         translated = [i for i in translated if not i.is_duplicate]
         results.append(StageResult("translate", len(classified), len(translated), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, current_stage="summarize")
 
         # --- Summarize ---
         t0 = time.monotonic()
         summarized = summarize(translated, bundle, repo, run_id)
         repo.update_items(summarized)
         results.append(StageResult("summarize", len(translated), len(summarized), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, current_stage="rank")
 
         # --- Rank ---
         t0 = time.monotonic()
         ranked = rank(summarized, bundle, preferences={}, repo=repo)
         repo.update_items(ranked)
         results.append(StageResult("rank", len(summarized), len(ranked), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, current_stage="cluster")
 
         # --- Build rolling pool for cluster/compose ---
         # Merge today's new items with classified items from the past 2 days so
         # that running the pipeline multiple times doesn't overwrite a rich digest
         # with a thin one when the article pool is already depleted.
+        import json as _json
         recent = repo.get_recent_pool_items(bundle.config.feed_id, days=2)
         current_ids = {item.id for item in ranked}
         pool = ranked + [item for item in recent if item.id not in current_ids]
         pool.sort(key=lambda i: i.relevance_score, reverse=True)
+        # Second-pass cross-lang dedup on the merged pool catches near-duplicates
+        # that slipped through when they were processed in separate pipeline runs.
+        pool = [i for i in dedup_translated(pool) if not i.is_duplicate]
+
+        # Prefer fresh content: move items already in the previous digest to the
+        # back of the pool so new articles get priority in cluster/compose.
+        prev_digest = repo.get_latest_digest(bundle.config.feed_id)
+        prev_ids: set[str] = set()
+        if prev_digest:
+            try:
+                prev_ids = set(_json.loads(prev_digest["item_ids"]))
+            except Exception:
+                pass
+        if prev_ids:
+            fresh = [i for i in pool if i.id not in prev_ids]
+            seen  = [i for i in pool if i.id in prev_ids]
+            pool  = fresh + seen
+            logger.info("run_id=%s pool freshness: %d new, %d from prev digest (deprioritised)",
+                        run_id, len(fresh), len(seen))
+
         logger.info("run_id=%s pool size: %d current + %d historical = %d",
                     run_id, len(ranked), len(pool) - len(ranked), len(pool))
 
@@ -171,6 +198,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         t0 = time.monotonic()
         clusters = cluster(pool, bundle, repo, run_id)
         results.append(StageResult("cluster", len(pool), len(clusters), time.monotonic() - t0))
+        repo.patch_pipeline_run(run_id, current_stage="compose")
 
         # --- Compose ---
         t0 = time.monotonic()

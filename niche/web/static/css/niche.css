@@ -214,6 +214,24 @@ main { max-width: 1240px; margin: 0 auto; padding: 2rem 1.5rem; }
   align-items: start;
 }
 
+/* Solo card (structurally alone, or alone after topic filtering) → full width */
+.cards-grid > article:only-child,
+.cards-grid.has-solo > article:not([style*="display: none"]):not([style*="display:none"]) {
+  grid-column: 1 / -1;
+}
+
+/* First card in a 3+ cluster → full-width hero */
+.cards-grid > article:first-child:nth-last-child(n+3) {
+  grid-column: 1 / -1;
+}
+
+/* Wide aspect ratio for full-width cards with images */
+.cards-grid > article:only-child .card-hero,
+.cards-grid.has-solo > article:not([style*="display: none"]):not([style*="display:none"]) .card-hero,
+.cards-grid > article:first-child:nth-last-child(n+3) .card-hero {
+  aspect-ratio: 21 / 9;
+}
+
 /* ── Card ────────────────────────────────────────────── */
 @keyframes fadeSlideUp {
   from { opacity: 0; transform: translateY(10px); }

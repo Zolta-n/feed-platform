@@ -16,17 +16,18 @@ _db_path = os.environ.get("DB_PATH", "niche.db")
 _bundle = load_bundle(_feed_dir)
 _repo = Repository(_db_path)
 _repo.create_schema()
+_repo.seed_watchlist_from_bundle(_bundle.config.feed_id, _bundle.companies)
 
 _resend_key = os.environ.get("RESEND_API_KEY")
 if _resend_key:
     from niche.core.email.resend_provider import ResendProvider
     _email_provider = ResendProvider(_resend_key)
 else:
-    from niche.core.email.dev_provider import DevEmailProvider
-    _email_provider = DevEmailProvider()
+    _email_provider = None
 
 application = create_app({
     "REPO": _repo,
+    "DB_PATH": _db_path,
     "BUNDLE": _bundle,
     "APP_URL": os.environ.get("APP_URL", "http://localhost:5000"),
     "APPROVAL_SECRET": os.environ.get("APPROVAL_SECRET", "dev-approval-secret"),

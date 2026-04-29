@@ -85,8 +85,11 @@ if (filterTabContainer) {
       card.style.display = (topic === 'all' || card.dataset.topic === topic) ? '' : 'none';
     });
     document.querySelectorAll('.cluster-section').forEach(section => {
-      const visible = [...section.querySelectorAll('.card')].some(c => c.style.display !== 'none');
-      section.style.display = visible ? '' : 'none';
+      const visibleCards = [...section.querySelectorAll('.card')].filter(c => c.style.display !== 'none');
+      section.style.display = visibleCards.length ? '' : 'none';
+      // Mark solo card so CSS can make it full-width
+      const grid = section.querySelector('.cards-grid');
+      if (grid) grid.classList.toggle('has-solo', visibleCards.length === 1);
     });
   });
 }

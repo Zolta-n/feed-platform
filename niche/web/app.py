@@ -16,11 +16,12 @@ login_manager = LoginManager()
 
 
 def _static_version() -> str:
-    import subprocess
+    import subprocess, time
     try:
-        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+        base = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+        # Append epoch-minutes so each restart busts the cache during development
+        return f"{base}-{int(time.time()) // 60}"
     except Exception:
-        import time
         return str(int(time.time()))
 
 
@@ -131,24 +132,43 @@ def create_app(config: dict | None = None) -> Flask:
 def _start_scheduler(app: Flask, bundle) -> None:
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
         from apscheduler.triggers.cron import CronTrigger
         from zoneinfo import ZoneInfo
 
-        hour, minute = bundle.config.daily_run_time.split(":")
+        db_path = app.config.get("DB_PATH", "niche.db")
+        repo = app.config.get("REPO")
+
+        # DB override takes precedence over bundle config
+        run_time = bundle.config.daily_run_time
+        if repo:
+            override = repo.get_app_config(bundle.config.feed_id, "scheduler_run_time")
+            if override:
+                run_time = override
+
+        hour, minute = run_time.split(":")
         tz = ZoneInfo(bundle.config.timezone)
     except Exception as exc:
         logger.warning("Scheduler not started: %s", exc)
         return
 
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(
+        jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")},
+        job_defaults={"misfire_grace_time": 3600},
+    )
+    # Store reference so admin can reschedule without restart
+    app.config["SCHEDULER"] = scheduler
 
     def _run_pipeline() -> None:
         import uuid
         from niche.core.pipeline.runner import run_pipeline
+        from niche.core.models.repository import Repository as _Repo
         with app.app_context():
-            repo = app.config.get("REPO")
-            if repo:
-                run_pipeline(bundle, repo, uuid.uuid4().hex)
+            worker_repo = _Repo(db_path)
+            try:
+                run_pipeline(bundle, worker_repo, uuid.uuid4().hex)
+            finally:
+                worker_repo.close()
 
     scheduler.add_job(
         _run_pipeline,
@@ -158,10 +178,13 @@ def _start_scheduler(app: Flask, bundle) -> None:
     )
 
     def _prune_read_log() -> None:
+        from niche.core.models.repository import Repository as _Repo
         with app.app_context():
-            repo = app.config.get("REPO")
-            if repo:
-                repo.prune_read_log(days=180)
+            worker_repo = _Repo(db_path)
+            try:
+                worker_repo.prune_read_log(days=180)
+            finally:
+                worker_repo.close()
 
     scheduler.add_job(
         _prune_read_log,
@@ -171,8 +194,4 @@ def _start_scheduler(app: Flask, bundle) -> None:
     )
 
     scheduler.start()
-    logger.info(
-        "Scheduler started: daily pipeline at %s %s",
-        bundle.config.daily_run_time,
-        bundle.config.timezone,
-    )
+    logger.info("Scheduler started: daily pipeline at %s %s", run_time, bundle.config.timezone)
