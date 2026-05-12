@@ -10,6 +10,7 @@ import httpx
 
 from niche.core.models.types import RawItem, SourceConfig
 from niche.core.sources.retry import fetch_with_retry
+from niche.core.sources.rss import _extract_image
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class GoogleNewsSource:
                 language="en",
                 published_at=published,
                 fetched_at=now,
+                image_url=_extract_image(entry),
             ))
         return items
 

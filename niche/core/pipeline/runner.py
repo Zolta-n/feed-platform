@@ -11,6 +11,7 @@ from niche.core.pipeline.classify import classify
 from niche.core.pipeline.cluster import cluster
 from niche.core.pipeline.compose import _DIGEST_MIN_ITEMS, compose
 from niche.core.pipeline.dedup import dedup, dedup_translated
+from niche.core.pipeline.fetch_images import fetch_og_images
 from niche.core.pipeline.filter_relevance import filter_items, filter_relevance
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
@@ -140,6 +141,19 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         if len(non_dupes) > _MAX_ITEMS_PER_RUN:
             non_dupes = _diverse_cap(non_dupes, bundle, _MAX_ITEMS_PER_RUN)
             logger.info("run_id=%s capped to %d items for LLM stages", run_id, len(non_dupes))
+
+        # --- Fetch og:image as fallback for items whose RSS feed had no image ---
+        t0 = time.monotonic()
+        before_with_image = sum(1 for i in non_dupes if i.image_url)
+        non_dupes = fetch_og_images(non_dupes)
+        after_with_image = sum(1 for i in non_dupes if i.image_url)
+        results.append(StageResult("fetch_images", len(non_dupes), len(non_dupes), time.monotonic() - t0))
+        # Persist image_url updates so later renders (and rolling pool reads) see them.
+        repo.update_items(non_dupes)
+        logger.info(
+            "run_id=%s og-image fetch: %d → %d items have image_url",
+            run_id, before_with_image, after_with_image,
+        )
 
         # --- Classify ---
         t0 = time.monotonic()
