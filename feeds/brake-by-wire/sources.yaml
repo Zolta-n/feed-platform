@@ -104,7 +104,7 @@ sources:
 
   - id: gnews-automotive-braking
     type: google_news
-    url: "https://news.google.com/rss/search?q=automotive+braking+system+supplier&hl=en-US&gl=US&ceid=US:en"
+    url: "https://news.google.com/rss/search?q=automotive+braking+system+supplier+-truck+-bus+-%22heavy+duty%22&hl=en-US&gl=US&ceid=US:en"
     name: "Google News: braking systems"
     default_region: null
     default_topic: tier1
@@ -122,11 +122,11 @@ sources:
 
   - id: gnews-ev-braking
     type: google_news
-    url: "https://news.google.com/rss/search?q=electric+vehicle+brake+regenerative&hl=en-US&gl=US&ceid=US:en"
+    url: "https://news.google.com/rss/search?q=%22passenger+car%22+%22regenerative+brake%22+-truck+-bus&hl=en-US&gl=US&ceid=US:en"
     name: "Google News: EV braking"
     default_region: null
     default_topic: technology
-    source_weight: 1.1
+    source_weight: 0.9
     enabled: true
 
   # --- Regulatory ---
