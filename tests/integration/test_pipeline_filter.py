@@ -69,3 +69,54 @@ def test_runner_persists_filter_stats(tmp_path, fixture_with_filters):
         assert "blocked" in stats
         assert "require_missed" in stats
         assert "samples" in stats
+
+
+def test_rolling_pool_filters_stale_items(tmp_path, fixture_with_filters):
+    """A stale Item already in the DB that matches a block phrase must not reach the digest."""
+    from datetime import datetime, timezone
+    from niche.core.models.repository import Repository
+    from niche.core.pipeline.filter_relevance import filter_items
+    from niche.core.models.types import Item
+
+    db_path = str(tmp_path / "pool.db")
+    repo = Repository(db_path)
+    repo.create_schema()
+    bundle = load_bundle(fixture_with_filters)
+
+    # Seed FK targets: a source and a pipeline_run row.
+    repo.upsert_source({
+        "id": "src", "feed_id": bundle.config.feed_id, "source_type": "stub",
+        "url": None, "name": "stub", "default_region": None, "default_topic": None,
+        "source_weight": 1.0, "enabled": 1, "added_by": "test",
+    })
+    repo.insert_pipeline_run("old-run", bundle.config.feed_id,
+                             datetime.now(timezone.utc).isoformat())
+
+    # Seed a "stale" item directly — the kind that would have been
+    # classified before filters existed: a transit-bus article.
+    stale = Item(
+        id="stale-1", feed_id=bundle.config.feed_id,
+        url="https://example.invalid/stale", url_hash="h-stale", title_hash="t-stale",
+        title="New transit bus brake retrofit",
+        title_translated="New transit bus brake retrofit",
+        body_raw="Body about transit bus rear axle brakes",
+        body_translated="Body about transit bus rear axle brakes",
+        summary="Stub summary", why_it_matters="Stub why",
+        source_id="src", source_name="src", source_language="en",
+        topic_tag="tier1", item_type="report", region_tag="europe",
+        company_tags=[], translation_failed=False, translation_provider=None,
+        relevance_score=1.0, published_at=None,
+        fetched_at=datetime.now(timezone.utc),
+        run_id="old-run", word_count=10, read_time_min=0.1,
+        is_duplicate=False, duplicate_of=None,
+    )
+    repo.insert_items([stale])
+
+    # Build a pool that includes the stale item, then apply filter_items
+    pool = repo.get_recent_pool_items(bundle.config.feed_id, days=2)
+    assert any(i.id == "stale-1" for i in pool), "stale item should be in the pool pre-filter"
+
+    survivors, stats = filter_items(pool, bundle.filters)
+    assert all(i.id != "stale-1" for i in survivors), "stale block-match must be dropped"
+    assert stats["blocked"] >= 1
+    repo.close()

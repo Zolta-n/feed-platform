@@ -237,6 +237,13 @@ class Repository:
         ).fetchone()
         return row[0] if row else 0.0
 
+    def get_run_total_usd(self, run_id: str) -> float:
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(usd), 0.0) FROM llm_cost_log WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        return float(row[0]) if row else 0.0
+
     # --- users ---
 
     def get_user_by_email(self, email: str) -> sqlite3.Row | None:

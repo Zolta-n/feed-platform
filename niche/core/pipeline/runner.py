@@ -11,7 +11,7 @@ from niche.core.pipeline.classify import classify
 from niche.core.pipeline.cluster import cluster
 from niche.core.pipeline.compose import _DIGEST_MIN_ITEMS, compose
 from niche.core.pipeline.dedup import dedup, dedup_translated
-from niche.core.pipeline.filter_relevance import filter_relevance
+from niche.core.pipeline.filter_relevance import filter_items, filter_relevance
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
 from niche.core.pipeline.translate import translate
@@ -77,7 +77,6 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
     repo.insert_pipeline_run(run_id, bundle.config.feed_id, started_at)
 
     results: list[StageResult] = []
-    total_usd = 0.0
 
     try:
         # Sync sources from bundle config into DB before any item inserts
@@ -189,6 +188,18 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         # that slipped through when they were processed in separate pipeline runs.
         pool = [i for i in dedup_translated(pool) if not i.is_duplicate]
 
+        # Apply feed-level filter to the rolling pool using translated text.
+        # Catches stale items from previous runs that predate the filter,
+        # and foreign-language items the pre-translate pass over-blocked.
+        pool, pool_filter_stats = filter_items(pool, bundle.filters)
+        if pool_filter_stats:
+            logger.info(
+                "run_id=%s pool filter dropped %d items (%d blocked, %d require_missed)",
+                run_id,
+                pool_filter_stats["blocked"] + pool_filter_stats["require_missed"],
+                pool_filter_stats["blocked"], pool_filter_stats["require_missed"],
+            )
+
         # Prefer fresh content: move items already in the previous digest to the
         # back of the pool so new articles get priority in cluster/compose.
         prev_digest = repo.get_latest_digest(bundle.config.feed_id)
@@ -230,6 +241,7 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
         results.append(StageResult("compose", len(ranked), digest.item_count, time.monotonic() - t0))
 
         finished_at = datetime.now(timezone.utc).isoformat()
+        total_usd = repo.get_run_total_usd(run_id)
         repo.update_pipeline_run(
             run_id,
             status="complete",

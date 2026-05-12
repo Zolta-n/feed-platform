@@ -123,3 +123,52 @@ def test_check_daily_cap_isolated_by_feed(repo):
     )
     # test-fixture has no spend — should not raise
     check_daily_cap(repo, "test-fixture", cap_usd=0.001)
+
+
+def test_get_run_total_usd_sums_calls_for_one_run(repo):
+    record_call(
+        repo,
+        feed_id="test-fixture",
+        run_id="run-A",
+        agent="classify",
+        model="claude-haiku-4-5",
+        prompt_name="classify-topic",
+        prompt_version=1,
+        input_tokens=100,
+        output_tokens=10,
+    )
+    record_call(
+        repo,
+        feed_id="test-fixture",
+        run_id="run-A",
+        agent="summarize",
+        model="claude-haiku-4-5",
+        prompt_name="summarize",
+        prompt_version=1,
+        input_tokens=200,
+        output_tokens=50,
+    )
+    expected = (
+        cost_usd("claude-haiku-4-5", 100, 10)
+        + cost_usd("claude-haiku-4-5", 200, 50)
+    )
+    assert repo.get_run_total_usd("run-A") == pytest.approx(expected, rel=1e-6)
+
+
+def test_get_run_total_usd_isolates_by_run_id(repo):
+    record_call(
+        repo,
+        feed_id="test-fixture",
+        run_id="run-A",
+        agent="classify",
+        model="claude-haiku-4-5",
+        prompt_name="classify-topic",
+        prompt_version=1,
+        input_tokens=100,
+        output_tokens=10,
+    )
+    assert repo.get_run_total_usd("run-B") == 0.0
+
+
+def test_get_run_total_usd_no_calls_returns_zero(repo):
+    assert repo.get_run_total_usd("never-existed") == 0.0

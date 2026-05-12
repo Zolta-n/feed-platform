@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from niche.core.models.types import FiltersConfig, FiltersRule, RawItem
-from niche.core.pipeline.filter_relevance import filter_relevance
+from niche.core.models.types import FiltersConfig, FiltersRule, Item, RawItem
+from niche.core.pipeline.filter_relevance import filter_items, filter_relevance
 
 
 def _raw(title: str, body: str = "") -> RawItem:
@@ -174,3 +174,129 @@ def test_stats_sample_shape():
     req_samples = [s for s in stats["samples"] if s["rule"] == "require_missed"]
     assert block_samples[0] == {"title": "Big lorry shipment", "matched": "lorry", "rule": "block"}
     assert req_samples[0] == {"title": "Random unrelated news", "matched": None, "rule": "require_missed"}
+
+
+# ---------------------------------------------------------------------------
+# filter_items — post-translate path used by the rolling pool merge
+# ---------------------------------------------------------------------------
+
+def _item(
+    title: str = "",
+    title_translated: str | None = None,
+    body_raw: str = "",
+    body_translated: str | None = None,
+) -> Item:
+    return Item(
+        id="item-1",
+        feed_id="feed",
+        url="https://example.invalid/x",
+        url_hash="h1",
+        title_hash="h2",
+        title=title,
+        title_translated=title_translated,
+        body_raw=body_raw,
+        body_translated=body_translated,
+        summary=None,
+        why_it_matters=None,
+        source_id="src-1",
+        source_name="Src",
+        source_language="en",
+        topic_tag=None,
+        item_type=None,
+        region_tag=None,
+        company_tags=[],
+        translation_failed=False,
+        translation_provider=None,
+        relevance_score=0.0,
+        published_at=None,
+        fetched_at=datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc),
+        run_id="run-1",
+        word_count=0,
+        read_time_min=0.0,
+        is_duplicate=False,
+        duplicate_of=None,
+    )
+
+
+def test_filter_items_uses_title_translated_when_set():
+    cfg = FiltersConfig(
+        block=None,
+        require_any=_rule(["brake"], ["title", "body"]),
+    )
+    items = [
+        _item(title="China meldet E-Auto-Wachstum", title_translated="China reports EV growth"),
+        _item(title="Etwas anderes", title_translated="Brake actuator news"),
+    ]
+    survivors, stats = filter_items(items, cfg)
+    assert len(survivors) == 1
+    assert survivors[0].title_translated == "Brake actuator news"
+    assert stats["require_missed"] == 1
+
+
+def test_filter_items_uses_body_translated_when_set():
+    cfg = FiltersConfig(
+        block=None,
+        require_any=_rule(["brake"], ["title", "body"]),
+    )
+    items = [
+        _item(
+            title="Original",
+            title_translated="Tier-1 announcement",
+            body_raw="original body without brake",
+            body_translated="details about brake actuator",
+        ),
+        _item(
+            title="X", title_translated="Tier-1 update",
+            body_raw="original mentions brake", body_translated="translated body, no relevant term",
+        ),
+    ]
+    survivors, stats = filter_items(items, cfg)
+    assert len(survivors) == 1
+    assert survivors[0].body_translated == "details about brake actuator"
+
+
+def test_filter_items_falls_back_to_title_when_no_translation():
+    cfg = FiltersConfig(
+        block=None,
+        require_any=_rule(["brake"], ["title", "body"]),
+    )
+    items = [
+        _item(title="Brake recall report", title_translated=None),
+        _item(title="Other news", title_translated=None),
+    ]
+    survivors, _ = filter_items(items, cfg)
+    assert len(survivors) == 1
+    assert survivors[0].title == "Brake recall report"
+
+
+def test_filter_items_no_filters_returns_unchanged():
+    items = [_item(title="anything")]
+    survivors, stats = filter_items(items, None)
+    assert survivors == items
+    assert stats == {}
+
+
+def test_filter_items_block_uses_translated_title():
+    cfg = FiltersConfig(
+        block=_rule(["transit bus"], ["title"]),
+        require_any=None,
+    )
+    items = [
+        _item(title="Linienbus Bremstest", title_translated="New transit bus brake test"),
+        _item(title="PKW-Bremsen", title_translated="Passenger car brake recall"),
+    ]
+    survivors, stats = filter_items(items, cfg)
+    assert len(survivors) == 1
+    assert survivors[0].title_translated == "Passenger car brake recall"
+    assert stats["blocked"] == 1
+
+
+def test_filter_items_block_wins_over_require():
+    cfg = FiltersConfig(
+        block=_rule(["transit bus"], ["title"]),
+        require_any=_rule(["brake"], ["title", "body"]),
+    )
+    item = _item(title_translated="New transit bus brake system")
+    survivors, stats = filter_items([item], cfg)
+    assert survivors == []
+    assert stats["blocked"] == 1
