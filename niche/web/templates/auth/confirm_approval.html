@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Approve user — {{ feed_name }}{% endblock %}
+{% block content %}
+<div style="max-width:420px; margin:4rem auto;">
+  <h1 style="margin-bottom:0.5rem;">Approve sign-in</h1>
+  <p class="meta" style="margin-bottom:2rem;">Approve <strong>{{ candidate_email }}</strong> to receive the {{ feed_name }} digest.</p>
+
+  <form method="post" action="{{ url_for('auth.approve_user', approval_token=approval_token) }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary" style="width:100%;">Approve {{ candidate_email }}</button>
+  </form>
+</div>
+{% endblock %}

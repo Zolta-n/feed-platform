@@ -72,13 +72,42 @@ class TestAuthRoutes:
         resp = client.post("/auth/request", data={"email": "approved@example.com"})
         assert resp.status_code == 200
 
-    def test_verify_valid_token(self, client, repo, bundle):
+    def test_verify_get_shows_confirmation_page(self, client, repo, bundle):
+        """GET on the magic link must NOT consume the token — must show a confirm page.
+        This defeats corporate URL scanners that pre-fetch links in email."""
         repo.upsert_user_admin("verify@example.com", bundle.config.feed_id)
         from niche.web.auth.magic_link import token_expiry
-        expires_at = token_expiry()
-        token = repo.create_magic_link_token("verify@example.com", expires_at)
-        resp = client.get(f"/auth/verify?token={token}", follow_redirects=True)
+        token = repo.create_magic_link_token("verify@example.com", token_expiry())
+
+        resp = client.get(f"/auth/verify?token={token}")
         assert resp.status_code == 200
+        assert b"Sign in" in resp.data
+        # token must NOT be marked used after GET
+        row = repo.get_magic_link_token(token)
+        assert row["used"] == 0
+
+    def test_verify_get_twice_still_works(self, client, repo, bundle):
+        """Multiple GETs (e.g. scanner + user) must each succeed without consuming the token."""
+        repo.upsert_user_admin("verify-twice@example.com", bundle.config.feed_id)
+        from niche.web.auth.magic_link import token_expiry
+        token = repo.create_magic_link_token("verify-twice@example.com", token_expiry())
+
+        # Simulate scanner pre-fetch then user click
+        resp1 = client.get(f"/auth/verify?token={token}")
+        resp2 = client.get(f"/auth/verify?token={token}")
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        # Token still unused
+        assert repo.get_magic_link_token(token)["used"] == 0
+
+    def test_verify_post_consumes_token_and_logs_in(self, client, repo, bundle):
+        repo.upsert_user_admin("verify-post@example.com", bundle.config.feed_id)
+        from niche.web.auth.magic_link import token_expiry
+        token = repo.create_magic_link_token("verify-post@example.com", token_expiry())
+
+        resp = client.post("/auth/verify", data={"token": token}, follow_redirects=False)
+        assert resp.status_code == 302
+        assert repo.get_magic_link_token(token)["used"] == 1
 
     def test_verify_invalid_token(self, client):
         resp = client.get("/auth/verify?token=badtoken")
@@ -94,14 +123,27 @@ class TestAuthRoutes:
         assert resp.status_code == 200
         assert b"invalid" in resp.data.lower() or b"expired" in resp.data.lower()
 
-    def test_approve_valid_token(self, client, repo, bundle):
-        repo.upsert_user_admin("admin2@example.com", bundle.config.feed_id)
-        user = repo.get_user_by_email("admin2@example.com")
+    def test_approve_get_shows_confirmation_no_db_change(self, client, repo, bundle):
+        """GET on /auth/approve must NOT mark the user approved — must show confirm page."""
+        user_id = repo.create_user("pending@example.com", bundle.config.feed_id)
         from niche.web.auth.magic_link import make_approval_token
-        token = make_approval_token(user["id"], "test-secret")
+        token = make_approval_token(user_id, "test-secret")
+
         resp = client.get(f"/auth/approve/{token}")
         assert resp.status_code == 200
+        assert b"Approve" in resp.data
+        # User must still be unapproved after GET
+        assert repo.get_user_by_id(user_id)["is_approved"] == 0
+
+    def test_approve_post_marks_user_approved(self, client, repo, bundle):
+        user_id = repo.create_user("pending2@example.com", bundle.config.feed_id)
+        from niche.web.auth.magic_link import make_approval_token
+        token = make_approval_token(user_id, "test-secret")
+
+        resp = client.post(f"/auth/approve/{token}")
+        assert resp.status_code == 200
         assert b"approved" in resp.data.lower()
+        assert repo.get_user_by_id(user_id)["is_approved"] == 1
 
     def test_approve_bad_token(self, client):
         resp = client.get("/auth/approve/badtoken")
@@ -187,7 +229,7 @@ class TestPasswordAuth:
 
         from niche.web.auth.magic_link import token_expiry
         token = repo.create_magic_link_token(email, token_expiry())
-        resp = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+        resp = client.post("/auth/verify", data={"token": token}, follow_redirects=False)
         assert resp.status_code == 302
         assert "/auth/set-password" in resp.headers["Location"]
 
@@ -260,7 +302,7 @@ class TestPasswordAuth:
         repo.set_password_hash(user["id"], hash_password("already-set-1"))
 
         token = repo.create_magic_link_token(email, token_expiry())
-        resp = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+        resp = client.post("/auth/verify", data={"token": token}, follow_redirects=False)
         assert resp.status_code == 302
         assert "/auth/set-password" not in resp.headers["Location"]
 

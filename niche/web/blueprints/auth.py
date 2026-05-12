@@ -106,9 +106,10 @@ def request_login():
     return render_template("auth/request.html")
 
 
-@bp.route("/verify")
+@bp.route("/verify", methods=["GET", "POST"])
 def verify():
-    token = request.args.get("token", "")
+    # Token may be in query string (GET from email link) or hidden form field (POST submit).
+    token = request.args.get("token") or request.form.get("token", "")
     repo = current_app.config["REPO"]
 
     row = repo.get_magic_link_token(token)
@@ -117,6 +118,14 @@ def verify():
     if is_token_expired(row["expires_at"]):
         return render_template("auth/invalid_link.html", expired=True)
 
+    if request.method == "GET":
+        # Render a confirmation page — do NOT consume the token here.
+        # Corporate URL scanners (Microsoft Defender, Mimecast, Proofpoint)
+        # pre-fetch every link in inbound email; if GET consumed the token
+        # the real user would see "Link invalid" when they actually click.
+        return render_template("auth/confirm_signin.html", token=token, email=row["email"])
+
+    # POST: real user clicked the button. Consume the token and log in.
     repo.mark_token_used(token)
 
     user_row = repo.get_user_by_email(row["email"])
@@ -186,7 +195,7 @@ def remove_password():
     return redirect(url_for("preferences.index"))
 
 
-@bp.route("/approve/<approval_token>")
+@bp.route("/approve/<approval_token>", methods=["GET", "POST"])
 def approve_user(approval_token: str):
     secret = current_app.config.get("APPROVAL_SECRET", os.environ.get("APPROVAL_SECRET", ""))
     user_id = validate_approval_token(approval_token, secret)
@@ -194,6 +203,19 @@ def approve_user(approval_token: str):
         return render_template("auth/invalid_link.html", expired=True)
 
     repo = current_app.config["REPO"]
+
+    if request.method == "GET":
+        # Same scanner-pre-fetch concern as /auth/verify. The HMAC approval
+        # token is reusable until expiry, so multiple GETs are safe — but the
+        # repo.approve_user() write must only happen on an explicit human POST.
+        candidate = repo.get_user_by_id(user_id)
+        candidate_email = candidate["email"] if candidate else "(unknown)"
+        return render_template(
+            "auth/confirm_approval.html",
+            approval_token=approval_token,
+            candidate_email=candidate_email,
+        )
+
     repo.approve_user(user_id)
     return render_template("auth/approved.html")
 
