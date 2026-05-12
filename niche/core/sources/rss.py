@@ -13,6 +13,19 @@ from niche.core.sources.retry import fetch_with_retry
 
 logger = logging.getLogger(__name__)
 
+# Many publishers serve empty feeds or 403 to the default `python-httpx/...`
+# User-Agent. A real browser UA is the reliable workaround. RSS feeds are
+# public content meant to be aggregated; sites that genuinely care about
+# identifying clients have other signals (Referer, API keys, etc.).
+_FETCH_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/121.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml; q=0.9, */*; q=0.8",
+}
+
 
 class RSSSource:
     def __init__(
@@ -46,7 +59,9 @@ class RSSSource:
             return []
 
     def _do_fetch(self) -> list[RawItem]:
-        response = httpx.get(self._config.url, timeout=30, follow_redirects=True)
+        response = httpx.get(
+            self._config.url, timeout=30, follow_redirects=True, headers=_FETCH_HEADERS,
+        )
         response.raise_for_status()
         feed = feedparser.parse(response.text)
         lang = (feed.feed.get("language") or "en")[:2]

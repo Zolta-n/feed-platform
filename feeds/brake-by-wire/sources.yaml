@@ -34,7 +34,7 @@ sources:
     default_region: americas
     default_topic: technology
     source_weight: 1.2
-    enabled: true
+    enabled: false   # RSS URL returns 404 — disable until a working feed URL is found
 
   - id: sae-international
     type: rss
@@ -81,7 +81,7 @@ sources:
     default_region: asia
     default_topic: oem
     source_weight: 1.2
-    enabled: true
+    enabled: false   # RSS URL returns 404 — disable until a working feed URL is found
 
   # --- Google News keyword queries ---
   # Google News weights lowered because (a) URLs redirect via JS through

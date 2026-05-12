@@ -10,7 +10,7 @@ import httpx
 
 from niche.core.models.types import RawItem, SourceConfig
 from niche.core.sources.retry import fetch_with_retry
-from niche.core.sources.rss import _extract_image
+from niche.core.sources.rss import _FETCH_HEADERS, _extract_image
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,9 @@ class GoogleNewsSource:
             return []
 
     def _do_fetch(self) -> list[RawItem]:
-        response = httpx.get(self._config.url, timeout=30, follow_redirects=True)
+        response = httpx.get(
+            self._config.url, timeout=30, follow_redirects=True, headers=_FETCH_HEADERS,
+        )
         response.raise_for_status()
         feed = feedparser.parse(response.text)
         now = datetime.now(timezone.utc)
