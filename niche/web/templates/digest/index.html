@@ -107,7 +107,15 @@
 {% if not clusters %}
 <div class="empty-state">
   <p style="font-size:1.25rem; margin-bottom:0.5rem;">No digest yet</p>
-  <p>Run the pipeline to generate today's digest.</p>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+    <p>Run the pipeline to generate today's digest.</p>
+    <form method="post" action="{{ url_for('admin.run_pipeline') }}" style="margin-top:1rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-primary">▶ Run pipeline</button>
+    </form>
+  {% else %}
+    <p>Your digest is being prepared. Check back soon.</p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

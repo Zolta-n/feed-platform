@@ -2,9 +2,14 @@
 {% block content %}
 <div class="empty-state">
   <h1>No digest yet</h1>
-  <p style="margin-top:1rem;">Run the pipeline to generate your first digest.</p>
-  <code style="display:block; margin-top:1rem; background:var(--surface); padding:0.75rem 1rem; border-radius:6px; font-size:0.85rem; text-align:left; max-width:400px; margin-left:auto; margin-right:auto;">
-    python cli.py pipeline run --feed-dir feeds/&lt;name&gt;
-  </code>
+  {% if current_user.is_authenticated and current_user.is_admin %}
+    <p style="margin-top:1rem;">Run the pipeline to generate the first digest.</p>
+    <form method="post" action="{{ url_for('admin.run_pipeline') }}" style="margin-top:1.25rem;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-primary">▶ Run pipeline</button>
+    </form>
+  {% else %}
+    <p style="margin-top:1rem;">Your digest is being prepared. Check back soon.</p>
+  {% endif %}
 </div>
 {% endblock %}
