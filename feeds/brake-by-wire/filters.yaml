@@ -3,9 +3,12 @@ version: 1
 # require_any: at least one phrase must match (title OR body).
 # Acts as a topical gate — articles that never mention any brake-related
 # term get dropped before we spend LLM tokens on them.
+# Multi-language phrases so non-English RSS sources (Electrive DE, Chinese)
+# survive the pre-translate filter pass.
 require_any:
   match_fields: [title, body]
   phrases:
+    # English
     - brake
     - brakes
     - braking
@@ -23,6 +26,28 @@ require_any:
     - by wire
     - iBooster
     - EHB
+    # German (Electrive DE, Automotive World DE coverage)
+    - Bremse
+    - Bremsen
+    - Bremsanlage
+    - Bremssystem
+    - Bremspedal
+    - Bremsbelag
+    - Bremssattel
+    - Rekuperation
+    # Chinese (CarNewsChina, CnEVPost, Gasgoo)
+    - 刹车
+    - 制动
+    - 刹车系统
+    - 制动系统
+    - 线控制动
+    # French / Spanish / Italian / Japanese / Korean (low-volume but cheap to include)
+    - frein
+    - freinage
+    - freno
+    - frenata
+    - ブレーキ
+    - 브레이크
 
 # block: any matching phrase drops the item outright.
 # Title-only by default — bodies often contain incidental mentions
