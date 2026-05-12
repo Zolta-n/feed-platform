@@ -9,6 +9,8 @@ from niche.core.models.types import (
     CompanyConfig,
     FeedBundle,
     FeedConfig,
+    FiltersConfig,
+    FiltersRule,
     ItemTypeConfig,
     NavTab,
     RegionConfig,
@@ -16,6 +18,8 @@ from niche.core.models.types import (
     TaxonomyConfig,
     TopicConfig,
 )
+
+_VALID_MATCH_FIELDS = {"title", "body"}
 
 REQUIRED_PROMPT_NAMES = [
     "summarize",
@@ -41,6 +45,7 @@ def load_bundle(feed_dir: str) -> FeedBundle:
     sources = _load_sources(feed_dir, config.feed_id)
     companies = _load_watchlist(feed_dir)
     prompts, prompt_meta = _load_prompts(feed_dir)
+    filters = _load_filters(feed_dir)
 
     return FeedBundle(
         config=config,
@@ -50,6 +55,7 @@ def load_bundle(feed_dir: str) -> FeedBundle:
         prompts=prompts,
         prompt_meta=prompt_meta,
         feed_dir=feed_dir,
+        filters=filters,
     )
 
 
@@ -168,6 +174,40 @@ def _load_watchlist(feed_dir: str) -> tuple[CompanyConfig, ...]:
             )
         )
     return tuple(companies)
+
+
+def _load_filters(feed_dir: str) -> FiltersConfig | None:
+    path = os.path.join(feed_dir, "filters.yaml")
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise BundleValidationError("filters.yaml: expected a YAML mapping")
+
+    block = _build_filter_rule(data.get("block"), "block")
+    require_any = _build_filter_rule(data.get("require_any"), "require_any")
+    return FiltersConfig(block=block, require_any=require_any)
+
+
+def _build_filter_rule(rule_data: dict | None, name: str) -> FiltersRule | None:
+    if not rule_data:
+        return None
+    phrases_raw = rule_data.get("phrases") or []
+    if not phrases_raw:
+        return None
+    match_fields = tuple(rule_data.get("match_fields") or ["title"])
+    invalid = [f for f in match_fields if f not in _VALID_MATCH_FIELDS]
+    if invalid:
+        raise BundleValidationError(
+            f"filters.yaml [{name}]: invalid match_fields {invalid}; "
+            f"allowed: {sorted(_VALID_MATCH_FIELDS)}"
+        )
+    phrases = tuple(str(p) for p in phrases_raw)
+    compiled = tuple(
+        re.compile(rf"\b{re.escape(p)}\b", re.IGNORECASE) for p in phrases
+    )
+    return FiltersRule(phrases=phrases, match_fields=match_fields, compiled=compiled)
 
 
 def _load_prompts(feed_dir: str) -> tuple[dict[str, str], dict[str, dict]]:

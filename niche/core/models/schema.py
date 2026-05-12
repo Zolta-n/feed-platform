@@ -204,6 +204,7 @@ _MIGRATIONS = [
     "ALTER TABLE preferences ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'red'",
     "ALTER TABLE pipeline_runs ADD COLUMN current_stage TEXT",
     "ALTER TABLE users ADD COLUMN password_hash TEXT",
+    "ALTER TABLE pipeline_runs ADD COLUMN filter_stats TEXT",
 ]
 
 

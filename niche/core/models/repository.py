@@ -55,7 +55,7 @@ class Repository:
 
     def patch_pipeline_run(self, run_id: str, **fields) -> None:
         """Partial mid-run update — only writes the supplied columns."""
-        allowed = {"items_fetched", "items_after_dedup", "items_in_digest", "total_usd", "status", "current_stage"}
+        allowed = {"items_fetched", "items_after_dedup", "items_in_digest", "total_usd", "status", "current_stage", "filter_stats"}
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return

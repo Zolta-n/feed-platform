@@ -1,0 +1,47 @@
+version: 1
+
+# require_any: at least one phrase must match (title OR body).
+# Acts as a topical gate — articles that never mention any brake-related
+# term get dropped before we spend LLM tokens on them.
+require_any:
+  match_fields: [title, body]
+  phrases:
+    - brake
+    - brakes
+    - braking
+    - regen
+    - regenerative
+    - ABS
+    - ESC
+    - EBS
+    - AEB
+    - actuator
+    - caliper
+    - rotor
+    - stopping distance
+    - by-wire
+    - by wire
+    - iBooster
+    - EHB
+
+# block: any matching phrase drops the item outright.
+# Title-only by default — bodies often contain incidental mentions
+# (e.g. an article about passenger-car brakes may quote a comparison
+# to a "transit bus" — we don't want to drop that).
+block:
+  match_fields: [title]
+  phrases:
+    - class 8 truck
+    - heavy-duty truck
+    - heavy duty truck
+    - transit bus
+    - coach
+    - lorry
+    - semi-trailer
+    - semi truck
+    - freight hauler
+    - e-bike
+    - ebike
+    - motorcycle
+    - moped
+    - scooter

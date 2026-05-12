@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -148,6 +149,19 @@ class FeedConfig:
 
 
 @dataclass(frozen=True)
+class FiltersRule:
+    phrases: tuple[str, ...]
+    match_fields: tuple[str, ...]
+    compiled: tuple[re.Pattern, ...]
+
+
+@dataclass(frozen=True)
+class FiltersConfig:
+    block: FiltersRule | None
+    require_any: FiltersRule | None
+
+
+@dataclass(frozen=True)
 class FeedBundle:
     config: FeedConfig
     taxonomy: TaxonomyConfig
@@ -156,3 +170,4 @@ class FeedBundle:
     prompts: dict[str, str]        # name → prompt body (front-matter stripped)
     prompt_meta: dict[str, dict]   # name → {version, model, last_updated, max_input_tokens}
     feed_dir: str                  # absolute path to the feed directory
+    filters: FiltersConfig | None = None

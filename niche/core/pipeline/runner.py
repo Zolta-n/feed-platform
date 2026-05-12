@@ -11,6 +11,7 @@ from niche.core.pipeline.classify import classify
 from niche.core.pipeline.cluster import cluster
 from niche.core.pipeline.compose import _DIGEST_MIN_ITEMS, compose
 from niche.core.pipeline.dedup import dedup, dedup_translated
+from niche.core.pipeline.filter_relevance import filter_relevance
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
 from niche.core.pipeline.translate import translate
@@ -103,7 +104,20 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
             raw_items.extend(fetched)
             logger.info("run_id=%s source=%s fetched=%d", run_id, source.source_id, len(fetched))
         results.append(StageResult("fetch", 0, len(raw_items), time.monotonic() - t0))
-        repo.patch_pipeline_run(run_id, items_fetched=len(raw_items), current_stage="dedup")
+        repo.patch_pipeline_run(run_id, items_fetched=len(raw_items), current_stage="filter")
+
+        # --- Filter (feed-level relevance) ---
+        # Drops obviously off-topic items pre-LLM so we don't burn tokens
+        # classifying / translating / summarizing junk. No-op if the feed
+        # bundle has no filters.yaml.
+        t0 = time.monotonic()
+        pre_filter_count = len(raw_items)
+        raw_items, filter_stats = filter_relevance(raw_items, bundle.filters)
+        results.append(StageResult("filter", pre_filter_count, len(raw_items), time.monotonic() - t0))
+        if filter_stats:
+            import json as _json_filter
+            repo.patch_pipeline_run(run_id, filter_stats=_json_filter.dumps(filter_stats))
+        repo.patch_pipeline_run(run_id, current_stage="dedup")
 
         # --- Dedup ---
         t0 = time.monotonic()
