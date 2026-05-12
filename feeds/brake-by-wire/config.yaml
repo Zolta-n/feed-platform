@@ -7,4 +7,4 @@ ui_languages: ["en"]
 default_ui_language: en
 timezone: Europe/Berlin
 daily_run_time: "05:30"
-from_email: "digest@yourdomain.com"
+from_email: "digest@businessintels.com"
