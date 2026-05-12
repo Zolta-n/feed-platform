@@ -109,6 +109,162 @@ class TestAuthRoutes:
         assert b"invalid" in resp.data.lower() or b"expired" in resp.data.lower()
 
 
+class TestPasswordAuth:
+    def _create_approved_user(self, repo, bundle, email):
+        user_id = repo.create_user(email, bundle.config.feed_id)
+        repo.approve_user(user_id)
+        return repo.get_user_by_email(email)
+
+    def test_correct_password_logs_in_instantly(self, client, repo, bundle):
+        from niche.web.auth.magic_link import hash_password, reset_password_attempts
+        email = "pw-ok@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("correct-horse-battery"))
+        reset_password_attempts(email)
+
+        resp = client.post(
+            "/auth/request",
+            data={"email": email, "password": "correct-horse-battery"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert "/auth/" not in resp.headers["Location"]
+
+    def test_wrong_password_shows_error_and_no_login(self, client, repo, bundle):
+        from niche.web.auth.magic_link import hash_password, reset_password_attempts
+        email = "pw-bad@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("correct-horse-battery"))
+        reset_password_attempts(email)
+
+        resp = client.post(
+            "/auth/request",
+            data={"email": email, "password": "wrong-password"},
+        )
+        assert resp.status_code == 200
+        assert b"Incorrect" in resp.data
+
+    def test_blank_password_falls_back_to_magic_link(self, client, repo, bundle):
+        from niche.web.auth.magic_link import hash_password, reset_password_attempts
+        email = "pw-fallback@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("correct-horse-battery"))
+        reset_password_attempts(email)
+
+        resp = client.post("/auth/request", data={"email": email, "password": ""})
+        assert resp.status_code == 200
+        assert b"check your email" in resp.data.lower() or b"sent" in resp.data.lower()
+
+    def test_no_password_set_falls_back_to_magic_link(self, client, repo, bundle):
+        email = "pw-none@example.com"
+        self._create_approved_user(repo, bundle, email)
+
+        resp = client.post(
+            "/auth/request",
+            data={"email": email, "password": "anything"},
+        )
+        assert resp.status_code == 200
+        assert b"Incorrect" in resp.data
+
+    def test_rate_limit_after_five_failures(self, client, repo, bundle):
+        from niche.web.auth.magic_link import hash_password, reset_password_attempts
+        email = "pw-limit@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("correct-horse-battery"))
+        reset_password_attempts(email)
+
+        for _ in range(5):
+            client.post("/auth/request", data={"email": email, "password": "wrong"})
+
+        resp = client.post("/auth/request", data={"email": email, "password": "wrong"})
+        assert resp.status_code == 200
+        assert b"Too many" in resp.data
+        reset_password_attempts(email)
+
+    def test_set_password_after_magic_link_login(self, client, app, repo, bundle):
+        email = "pw-set@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+
+        from niche.web.auth.magic_link import token_expiry
+        token = repo.create_magic_link_token(email, token_expiry())
+        resp = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/auth/set-password" in resp.headers["Location"]
+
+        resp = client.post(
+            "/auth/set-password",
+            data={"new_password": "new-pass-1234", "confirm_password": "new-pass-1234"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert repo.get_password_hash(user["id"])
+
+    def test_set_password_mismatch(self, client, app, repo, bundle):
+        email = "pw-mismatch@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        _login(client, app, user)
+
+        resp = client.post(
+            "/auth/set-password",
+            data={"new_password": "alpha-1234", "confirm_password": "beta-12345"},
+        )
+        assert resp.status_code == 200
+        assert b"do not match" in resp.data
+        assert repo.get_password_hash(user["id"]) is None
+
+    def test_set_password_too_short(self, client, app, repo, bundle):
+        email = "pw-short@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        _login(client, app, user)
+
+        resp = client.post(
+            "/auth/set-password",
+            data={"new_password": "abc", "confirm_password": "abc"},
+        )
+        assert resp.status_code == 200
+        assert b"at least" in resp.data
+        assert repo.get_password_hash(user["id"]) is None
+
+    def test_set_password_invalidates_existing_magic_links(self, client, app, repo, bundle):
+        from niche.web.auth.magic_link import token_expiry
+        email = "pw-invalidate@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        token = repo.create_magic_link_token(email, token_expiry())
+        _login(client, app, user)
+
+        client.post(
+            "/auth/set-password",
+            data={"new_password": "fresh-password-1", "confirm_password": "fresh-password-1"},
+        )
+
+        row = repo.get_magic_link_token(token)
+        assert row["used"] == 1
+
+    def test_remove_password(self, client, app, repo, bundle):
+        from niche.web.auth.magic_link import hash_password
+        email = "pw-remove@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("some-password-1"))
+        _login(client, app, user)
+
+        resp = client.post("/auth/remove-password", follow_redirects=False)
+        assert resp.status_code == 302
+        assert repo.get_password_hash(user["id"]) is None
+
+    def test_verify_skips_set_password_prompt_when_password_already_set(
+        self, client, repo, bundle
+    ):
+        from niche.web.auth.magic_link import hash_password, token_expiry
+        email = "pw-already@example.com"
+        user = self._create_approved_user(repo, bundle, email)
+        repo.set_password_hash(user["id"], hash_password("already-set-1"))
+
+        token = repo.create_magic_link_token(email, token_expiry())
+        resp = client.get(f"/auth/verify?token={token}", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "/auth/set-password" not in resp.headers["Location"]
+
+
 class TestDigestRoutes:
     def test_digest_redirects_unauthenticated(self, client):
         resp = client.get("/")

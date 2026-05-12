@@ -74,7 +74,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_enabled INTEGER NOT NULL DEFAULT 1,
     email_send_time TEXT NOT NULL DEFAULT '06:30',
     email_item_count INTEGER NOT NULL DEFAULT 15,
-    deleted_at TEXT
+    deleted_at TEXT,
+    password_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS preferences (
@@ -202,6 +203,7 @@ _MIGRATIONS = [
     "ALTER TABLE items ADD COLUMN image_url TEXT",
     "ALTER TABLE preferences ADD COLUMN theme_color TEXT NOT NULL DEFAULT 'red'",
     "ALTER TABLE pipeline_runs ADD COLUMN current_stage TEXT",
+    "ALTER TABLE users ADD COLUMN password_hash TEXT",
 ]
 
 

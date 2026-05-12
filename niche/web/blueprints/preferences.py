@@ -32,6 +32,8 @@ def index():
         except (KeyError, IndexError):
             theme_color = "red"
 
+    has_password = bool(repo.get_password_hash(current_user.id))
+
     if request.method == "POST":
         topic_weights = {}
         for topic in bundle.taxonomy.topics:
@@ -75,6 +77,7 @@ def index():
         regions=bundle.taxonomy.regions,
         prefs=prefs,
         theme_color=theme_color,
+        has_password=has_password,
     )
 
 

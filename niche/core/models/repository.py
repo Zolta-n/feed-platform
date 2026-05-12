@@ -286,6 +286,31 @@ class Repository:
         )
         self._conn.commit()
 
+    def set_password_hash(self, user_id: str, password_hash: str | None) -> None:
+        self._conn.execute(
+            "UPDATE users SET password_hash=? WHERE id=?", (password_hash, user_id)
+        )
+        self._conn.commit()
+
+    def get_password_hash(self, user_id: str) -> str | None:
+        row = self._conn.execute(
+            "SELECT password_hash FROM users WHERE id=? AND deleted_at IS NULL",
+            (user_id,),
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            return row["password_hash"]
+        except (KeyError, IndexError):
+            return None
+
+    def invalidate_magic_links_for_email(self, email: str) -> None:
+        self._conn.execute(
+            "UPDATE magic_link_tokens SET used=1 WHERE email=? AND used=0",
+            (email,),
+        )
+        self._conn.commit()
+
     def upsert_user_admin(self, email: str, feed_id: str) -> None:
         now = datetime.now(timezone.utc).isoformat()
         self._conn.execute(

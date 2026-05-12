@@ -3,7 +3,7 @@
 {% block content %}
 <div style="max-width:380px; margin:4rem auto;">
   <h1 style="margin-bottom:0.5rem;">Sign in</h1>
-  <p class="meta" style="margin-bottom:2rem;">We'll email you a sign-in link. No password needed.</p>
+  <p class="meta" style="margin-bottom:2rem;">Enter your password if you've set one, or leave it blank to get an email sign-in link.</p>
 
   {% if error %}
   <div class="flash error" style="margin-bottom:1rem; border-radius:6px;">{{ error }}</div>
@@ -13,9 +13,13 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <label for="email">Email address</label>
-      <input type="email" id="email" name="email" autofocus required placeholder="you@example.com">
+      <input type="email" id="email" name="email" value="{{ email or '' }}" autofocus required placeholder="you@example.com">
     </div>
-    <button type="submit" class="btn btn-primary" style="width:100%;">Send sign-in link</button>
+    <div class="form-group">
+      <label for="password">Password <span class="meta" style="font-weight:normal;">(optional)</span></label>
+      <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Leave blank to email a link">
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%;">Sign in</button>
   </form>
 </div>
 {% endblock %}

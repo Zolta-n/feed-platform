@@ -5,12 +5,65 @@ import hmac
 import logging
 import os
 import secrets
+import threading
+import time
 from datetime import datetime, timedelta, timezone
+
+from werkzeug.security import check_password_hash, generate_password_hash
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_TTL_MINUTES = 15
 _APPROVAL_TOKEN_TTL_HOURS = 72
+
+MIN_PASSWORD_LENGTH = 8
+_PASSWORD_RATE_LIMIT = 5
+_PASSWORD_RATE_WINDOW_SECONDS = 15 * 60
+
+_password_attempts: dict[str, list[float]] = {}
+_password_attempts_lock = threading.Lock()
+
+
+def hash_password(plain: str) -> str:
+    return generate_password_hash(plain)
+
+
+def verify_password(plain: str, stored_hash: str | None) -> bool:
+    if not stored_hash:
+        return False
+    try:
+        return check_password_hash(stored_hash, plain)
+    except Exception:
+        return False
+
+
+def validate_password_strength(plain: str) -> str | None:
+    """Returns None if OK, otherwise an error message."""
+    if len(plain) < MIN_PASSWORD_LENGTH:
+        return f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+    return None
+
+
+def _now() -> float:
+    return time.time()
+
+
+def password_attempt_blocked(email: str) -> bool:
+    cutoff = _now() - _PASSWORD_RATE_WINDOW_SECONDS
+    with _password_attempts_lock:
+        attempts = [t for t in _password_attempts.get(email, []) if t >= cutoff]
+        _password_attempts[email] = attempts
+        return len(attempts) >= _PASSWORD_RATE_LIMIT
+
+
+def record_password_failure(email: str) -> None:
+    with _password_attempts_lock:
+        _password_attempts.setdefault(email, []).append(_now())
+
+
+def reset_password_attempts(email: str) -> None:
+    with _password_attempts_lock:
+        _password_attempts.pop(email, None)
 
 
 def generate_login_token() -> str:
