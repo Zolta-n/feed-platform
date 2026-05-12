@@ -120,14 +120,15 @@ def verify():
 
     if request.method == "GET":
         # Render a confirmation page — do NOT consume the token here.
-        # Corporate URL scanners (Microsoft Defender, Mimecast, Proofpoint)
-        # pre-fetch every link in inbound email; if GET consumed the token
-        # the real user would see "Link invalid" when they actually click.
         return render_template("auth/confirm_signin.html", token=token, email=row["email"])
 
-    # POST: real user clicked the button. Consume the token and log in.
-    repo.mark_token_used(token)
-
+    # POST: log in. Tokens are valid for multiple uses within the 15-min TTL
+    # because corporate URL scanners (Microsoft Defender's "detonation"
+    # feature) actively submit forms during malware testing — if POST
+    # consumed the token, Defender's pre-fetch would invalidate it before
+    # the user ever clicks. The `used` flag is still respected for *explicit*
+    # invalidation (e.g., via invalidate_magic_links_for_email after a
+    # password is set).
     user_row = repo.get_user_by_email(row["email"])
     if not user_row:
         return render_template("auth/invalid_link.html")

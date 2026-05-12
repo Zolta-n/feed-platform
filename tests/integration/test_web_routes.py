@@ -100,14 +100,53 @@ class TestAuthRoutes:
         # Token still unused
         assert repo.get_magic_link_token(token)["used"] == 0
 
-    def test_verify_post_consumes_token_and_logs_in(self, client, repo, bundle):
+    def test_verify_post_logs_in_without_consuming_token(self, client, repo, bundle):
+        """POST logs the user in but leaves the token valid for the remaining TTL.
+        Tokens are multi-use within the 15-min window — corporate scanners
+        (Defender detonation) auto-submit forms, which would otherwise lock
+        out the real user."""
         repo.upsert_user_admin("verify-post@example.com", bundle.config.feed_id)
         from niche.web.auth.magic_link import token_expiry
         token = repo.create_magic_link_token("verify-post@example.com", token_expiry())
 
         resp = client.post("/auth/verify", data={"token": token}, follow_redirects=False)
         assert resp.status_code == 302
-        assert repo.get_magic_link_token(token)["used"] == 1
+        # Token must remain valid — Defender may have submitted it first.
+        assert repo.get_magic_link_token(token)["used"] == 0
+
+    def test_verify_survives_scanner_post_then_user_click(self, client, repo, bundle):
+        """End-to-end: simulate Defender's GET+POST detonation, then the real user
+        clicking and POSTing. User must still get logged in."""
+        repo.upsert_user_admin("scanner-test@example.com", bundle.config.feed_id)
+        from niche.web.auth.magic_link import token_expiry
+        token = repo.create_magic_link_token("scanner-test@example.com", token_expiry())
+
+        # Defender scanner: GET (preview) + POST (auto-submit form)
+        scanner_get = client.get(f"/auth/verify?token={token}")
+        scanner_post = client.post("/auth/verify", data={"token": token}, follow_redirects=False)
+        assert scanner_get.status_code == 200
+        assert scanner_post.status_code == 302  # scanner "logged in" too, but its session won't persist
+
+        # Real user (separate client, separate session)
+        from flask import Flask
+        with client.application.test_client() as user_client:
+            user_get = user_client.get(f"/auth/verify?token={token}")
+            assert user_get.status_code == 200
+            assert b"Continue to" in user_get.data
+            user_post = user_client.post("/auth/verify", data={"token": token}, follow_redirects=False)
+            assert user_post.status_code == 302  # user logged in successfully
+
+    def test_verify_explicitly_invalidated_token_rejected(self, client, repo, bundle):
+        """Tokens explicitly marked used=1 (e.g., via invalidate_magic_links_for_email
+        after a password is set) must still be rejected."""
+        repo.upsert_user_admin("invalidated@example.com", bundle.config.feed_id)
+        from niche.web.auth.magic_link import token_expiry
+        token = repo.create_magic_link_token("invalidated@example.com", token_expiry())
+        repo.mark_token_used(token)  # simulate explicit invalidation
+
+        resp = client.get(f"/auth/verify?token={token}")
+        assert resp.status_code == 200
+        assert b"invalid" in resp.data.lower()
 
     def test_verify_invalid_token(self, client):
         resp = client.get("/auth/verify?token=badtoken")
