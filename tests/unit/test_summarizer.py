@@ -69,7 +69,35 @@ def test_stub_directly(item, bundle):
 
 # --- LLM path ---
 
-def test_llm_sets_summary_fields(monkeypatch, item, bundle):
+def test_llm_v2_shape_produces_json_bullets_and_takeaway(monkeypatch, item, bundle):
+    """v2 prompt returns key_points + takeaway → stored as JSON list in summary, takeaway in why_it_matters."""
+    import json as _json
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    resp = _make_response(
+        '{"key_points": ["First key point about the deal.", '
+        '"Second point with a number 42.", '
+        '"Third point about timing."], '
+        '"takeaway": "Tier-2 BBW suppliers should monitor this."}'
+    )
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = resp
+
+    with patch("anthropic.Anthropic", return_value=mock_client):
+        result = summarize([item], bundle)
+
+    assert len(result) == 1
+    bullets = _json.loads(result[0].summary)
+    assert bullets == [
+        "First key point about the deal.",
+        "Second point with a number 42.",
+        "Third point about timing.",
+    ]
+    assert result[0].why_it_matters == "Tier-2 BBW suppliers should monitor this."
+    assert result[0].word_count > 0
+
+
+def test_llm_v1_shape_backward_compat(monkeypatch, item, bundle):
+    """Older {summary, why_it_matters} JSON still parses (kept for safety during migration)."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     resp = _make_response('{"summary": "Two-sentence factual summary here.", "why_it_matters": "One sentence significance."}')
     mock_client = MagicMock()
@@ -81,13 +109,12 @@ def test_llm_sets_summary_fields(monkeypatch, item, bundle):
     assert len(result) == 1
     assert result[0].summary == "Two-sentence factual summary here."
     assert result[0].why_it_matters == "One sentence significance."
-    assert result[0].word_count == len("Two-sentence factual summary here.".split())
 
 
 def test_read_time_floor_applied(monkeypatch, item, bundle):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    # Very short summary → raw word_count / 200 < 1.0 → floor kicks in
-    resp = _make_response('{"summary": "Short.", "why_it_matters": "Brief."}')
+    # Very short bullets → raw word_count / 200 < 1.0 → floor kicks in
+    resp = _make_response('{"key_points": ["Short."], "takeaway": "Brief."}')
     mock_client = MagicMock()
     mock_client.messages.create.return_value = resp
 
@@ -100,7 +127,7 @@ def test_read_time_floor_applied(monkeypatch, item, bundle):
 def test_retry_on_bad_json(monkeypatch, item, bundle):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     bad = _make_response("not json at all")
-    good = _make_response('{"summary": "Recovered summary.", "why_it_matters": "It matters."}')
+    good = _make_response('{"key_points": ["Recovered point."], "takeaway": "It matters."}')
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = [bad, good]
 
@@ -108,7 +135,8 @@ def test_retry_on_bad_json(monkeypatch, item, bundle):
         result = summarize([item], bundle)
 
     assert len(result) == 1
-    assert result[0].summary == "Recovered summary."
+    import json as _json
+    assert _json.loads(result[0].summary) == ["Recovered point."]
     assert mock_client.messages.create.call_count == 2
 
 
@@ -127,7 +155,7 @@ def test_both_attempts_fail_excludes_item(monkeypatch, item, bundle):
 
 def test_records_cost_to_repo(monkeypatch, item, bundle, repo):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    resp = _make_response('{"summary": "A summary.", "why_it_matters": "It matters."}')
+    resp = _make_response('{"key_points": ["Point."], "takeaway": "It matters."}')
     mock_client = MagicMock()
     mock_client.messages.create.return_value = resp
 
@@ -155,7 +183,7 @@ def test_multiple_items_processed(monkeypatch, bundle):
             is_duplicate=False, duplicate_of=None,
         ))
 
-    good = _make_response('{"summary": "Summary text.", "why_it_matters": "Matters."}')
+    good = _make_response('{"key_points": ["Point one.", "Point two."], "takeaway": "Matters."}')
     mock_client = MagicMock()
     mock_client.messages.create.return_value = good
 

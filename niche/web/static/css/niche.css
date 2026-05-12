@@ -351,6 +351,23 @@ main { max-width: 1240px; margin: 0 auto; padding: 2rem 1.5rem; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.card-bullets {
+  margin: 0 0 0.65rem 1.1rem;
+  padding: 0;
+  font-size: 0.84rem;
+  color: #bbbfd4;
+  line-height: 1.55;
+}
+.card-bullets li { margin: 0 0 0.25rem; }
+.summary-bullets {
+  margin: 0 0 0.8rem 1.25rem;
+  padding: 0;
+  color: #bfc3d8;
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.summary-bullets li { margin: 0 0 0.35rem; }
+body.compact .card-bullets { display: none; }
 
 /* Card footer */
 .card-footer {

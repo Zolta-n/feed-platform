@@ -61,7 +61,12 @@
         </a>
       </h2>
 
-      {% if item.summary %}
+      {% set bullets = item.summary | as_bullets %}
+      {% if bullets %}
+      <ul class="card-bullets">
+        {% for p in bullets %}<li>{{ p }}</li>{% endfor %}
+      </ul>
+      {% elif item.summary %}
       <p class="card-summary">{{ item.summary | truncate(160, True, '…') }}</p>
       {% endif %}
 

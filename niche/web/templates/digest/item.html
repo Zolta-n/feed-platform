@@ -23,9 +23,16 @@
     {% for co in company_tags %}<span class="tag">{{ co }}</span>{% endfor %}
   </div>
 
-  {% if item.summary %}
+  {% set bullets = item.summary | as_bullets %}
+  {% if bullets or item.summary %}
   <div class="card" style="margin-bottom:1.25rem;">
+    {% if bullets %}
+    <ul class="summary-bullets">
+      {% for p in bullets %}<li>{{ p }}</li>{% endfor %}
+    </ul>
+    {% else %}
     <p class="summary-text">{{ item.summary }}</p>
+    {% endif %}
     {% if item.why_it_matters %}
     <p class="why-matters">{{ item.why_it_matters }}</p>
     {% endif %}

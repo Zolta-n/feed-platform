@@ -7,6 +7,7 @@ from flask import Flask, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
+from niche.web.template_filters import as_bullets
 from niche.web.user import User
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def create_app(config: dict | None = None) -> Flask:
         app.config.update(config)
 
     csrf.init_app(app)
+    app.add_template_filter(as_bullets, name="as_bullets")
 
     login_manager.init_app(app)
     login_manager.login_view = "auth.request_login"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import replace
@@ -8,8 +9,12 @@ from niche.core.models.types import FeedBundle, Item
 
 logger = logging.getLogger(__name__)
 
-_STUB_SUMMARY = "Stub summary for synthetic test content."
-_STUB_WHY = "Stub why-it-matters for synthetic test content."
+_STUB_KEY_POINTS = [
+    "Stub bullet 1 for synthetic test content.",
+    "Stub bullet 2 for synthetic test content.",
+    "Stub bullet 3 for synthetic test content.",
+]
+_STUB_TAKEAWAY = "Stub takeaway for synthetic test content."
 
 
 def summarize(
@@ -25,10 +30,11 @@ def summarize(
 
 
 def _summarize_stub(items: list[Item], bundle: FeedBundle) -> list[Item]:
-    stub_wc = len(_STUB_SUMMARY.split())
+    summary_storage = json.dumps(_STUB_KEY_POINTS)
+    stub_wc = len(" ".join(_STUB_KEY_POINTS).split())
     stub_rt = max(1.0, stub_wc / 200)
     return [
-        replace(item, summary=_STUB_SUMMARY, why_it_matters=_STUB_WHY,
+        replace(item, summary=summary_storage, why_it_matters=_STUB_TAKEAWAY,
                 word_count=stub_wc, read_time_min=stub_rt)
         for item in items
     ]
