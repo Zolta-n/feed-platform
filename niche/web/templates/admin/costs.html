@@ -1,0 +1,94 @@
+{% extends "admin/base.html" %}
+{% set active_section = 'costs' %}
+
+{% block admin_content %}
+<div class="admin-section-title">Cost tracking</div>
+
+<div class="admin-grid" style="margin-bottom:24px;">
+  <div class="admin-card">
+    <div class="admin-card-title">This month</div>
+    <div class="admin-stat">${{ '%.3f'|format(month_total) }}</div>
+    <div class="admin-stat-sub">of $20.00 budget</div>
+  </div>
+  <div class="admin-card">
+    <div class="admin-card-title">Today</div>
+    <div class="admin-stat">${{ '%.3f'|format(today_total) }}</div>
+    <div class="admin-stat-sub">of $1.00 daily cap</div>
+  </div>
+  <div class="admin-card">
+    <div class="admin-card-title">Cache hit rate</div>
+    <div class="admin-stat">{{ cache_hit_rate }}%</div>
+    <div class="admin-stat-sub">prompt cache</div>
+  </div>
+</div>
+
+{% if by_agent %}
+<div style="margin-bottom:24px;">
+  <div class="admin-section-title" style="font-size:12px;margin-bottom:12px;">By agent</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th>Model</th>
+          <th>Calls</th>
+          <th>Input tokens</th>
+          <th>Output tokens</th>
+          <th>Cache read</th>
+          <th>Cost (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in by_agent %}
+        <tr>
+          <td style="color:var(--f1);">{{ row.agent }}</td>
+          <td>{{ row.model }}</td>
+          <td>{{ row.calls }}</td>
+          <td>{{ '{:,}'.format(row.input_tokens) }}</td>
+          <td>{{ '{:,}'.format(row.output_tokens) }}</td>
+          <td>{{ '{:,}'.format(row.cache_read_tokens) }}</td>
+          <td>${{ '%.4f'|format(row.usd) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if recent_calls %}
+<div>
+  <div class="admin-section-title" style="font-size:12px;margin-bottom:12px;">Recent calls (last 50)</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Agent</th>
+          <th>Model</th>
+          <th>Prompt</th>
+          <th>In</th>
+          <th>Out</th>
+          <th>Cache</th>
+          <th>USD</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for call in recent_calls %}
+        <tr>
+          <td>{{ call.called_at[11:16] if call.called_at else '—' }}</td>
+          <td>{{ call.agent }}</td>
+          <td>{{ call.model }}</td>
+          <td>{{ call.prompt_name or '—' }} {% if call.prompt_version %}v{{ call.prompt_version }}{% endif %}</td>
+          <td>{{ call.input_tokens }}</td>
+          <td>{{ call.output_tokens }}</td>
+          <td>{{ call.cache_read_tokens }}</td>
+          <td>${{ '%.4f'|format(call.usd) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

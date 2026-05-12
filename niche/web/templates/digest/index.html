@@ -1,0 +1,329 @@
+{% extends "app_base.html" %}
+
+{% block title %}{{ feed_name }} — {{ date }}{% endblock %}
+
+{% block nav_center %}
+<div class="nav-search">
+  <span class="nav-search-icon">⌕</span>
+  <input type="text" id="digest-search" placeholder="Search digest…" autocomplete="off">
+</div>
+{% endblock %}
+
+{% block after_nav %}
+{# ── BREAKING TICKER ───────────────────────────────────────────────────── #}
+{% if breaking_items %}
+<div class="ticker" id="ticker">
+  <div class="ticker-live">
+    <span class="ticker-dot"></span>
+    LIVE
+  </div>
+  <div style="overflow:hidden;flex:1;">
+    <div class="ticker-scroll" id="ticker-scroll">
+      {% set ticker_duped = breaking_items + breaking_items %}
+      {% for item in ticker_duped %}
+      <div class="ticker-item">
+        <span class="badge badge-{{ item.item_type or 'report' }}">{{ item.item_type|title if item.item_type else 'Report' }}</span>
+        <span class="ticker-item-text">{{ (item.title_translated or item.title or '')|truncate(90, True, '…') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── TAB NAV ───────────────────────────────────────────────────────────── #}
+<div class="tabs-bar">
+  <div class="tabs">
+    {% set tabs = [('ALL', 'ALL'), ('TIER-1', 'TIER-1'), ('OEM', 'OEM'), ('TECHNOLOGY', 'TECHNOLOGY'), ('REGULATION', 'REGULATION')] %}
+    {% for tab_key, tab_label in tabs %}
+    <a class="tab{% if active_tab == tab_key %} active{% endif %}"
+       data-filter="{{ tab_key }}"
+       data-date="{{ date }}"
+       href="{{ url_for('digest.index') }}?tab={{ tab_key }}&date={{ date }}">
+      {{ tab_label }}
+    </a>
+    {% endfor %}
+  </div>
+  <div class="tabs-meta" data-base="{{ date|upper }} &nbsp;·&nbsp; {{ total_items }} ITEMS &nbsp;·&nbsp; ~{{ total_read_time }} MIN READ">
+    {{ date|upper }} &nbsp;·&nbsp; {{ total_items }} ITEMS &nbsp;·&nbsp; ~{{ total_read_time }} MIN READ
+  </div>
+</div>
+{% endblock %}
+
+{% block app_content %}
+<div class="body-layout">
+
+  {# ── FEED COLUMN ───────────────────────────────────────────────────────── #}
+  <div class="feed-col">
+
+    {% if not cluster_map %}
+      {% include "digest/empty.html" %}
+    {% else %}
+
+    {% for cluster in cluster_map %}
+    <div class="cluster-block fade-in"
+         data-topic="{{ cluster.label|upper }}"
+         style="{% if active_tab != 'ALL' and cluster.topic_tag and active_tab != cluster.topic_tag %}display:none{% endif %}">
+
+      <div class="cluster-header">
+        <span class="cluster-label">{{ cluster.label }}</span>
+        <span class="cluster-line"></span>
+        <span class="cluster-count">{{ cluster.articles|length }} item{{ 's' if cluster.articles|length != 1 }}</span>
+      </div>
+
+      {# Lead blurb on first cluster in ALL tab #}
+      {% if loop.first and active_tab == 'ALL' and cluster.lead_blurb %}
+      <div class="lead-blurb">
+        <div class="lead-blurb-label">Editor's lead</div>
+        <div class="lead-blurb-text">{{ cluster.lead_blurb }}</div>
+      </div>
+      {% endif %}
+
+      {% for item in cluster.articles %}
+      {% set companies = item.company_tags|fromjson if item.company_tags else [] %}
+      {% set is_read = item.id in read_item_ids %}
+      {% set feedback = item_feedback.get(item.id) %}
+      <div class="card{% if is_read %} is-read{% endif %} fade-in"
+           data-id="{{ item.id }}"
+           data-topic="{{ item.topic_tag|upper if item.topic_tag else '' }}">
+
+        {# Top row #}
+        <div class="card-top">
+          <span class="badge badge-{{ item.item_type or 'report' }}">{{ item.item_type|title if item.item_type else 'Report' }}</span>
+          <span class="cat-tag">{{ item.topic_tag|upper if item.topic_tag else '' }}</span>
+          {% if item.region_tag %}
+          <span class="region-pill">{{ item.region_tag }}</span>
+          {% endif %}
+          <span class="card-read-marker"{% if not is_read %} style="display:none"{% endif %}>✓ READ</span>
+        </div>
+
+        {# Title #}
+        <div class="card-title">{{ item.title_translated or item.title or '(no title)' }}</div>
+
+        {# Summary #}
+        {% if item.summary %}
+        <div class="card-summary">{{ item.summary }}</div>
+        {% endif %}
+
+        {# Why it matters #}
+        {% if item.why_it_matters %}
+        <div class="card-why">{{ item.why_it_matters }}</div>
+        {% endif %}
+
+        {# Companies #}
+        {% if companies %}
+        <div class="card-companies">
+          {% for company in companies %}
+          <span class="company-chip">{{ company }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Footer #}
+        <div class="card-footer">
+          <div class="card-source">
+            <div class="avatar">{{ (item.source_name or 'XX')[:2]|upper }}</div>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--f4);">{{ item.source_name or '' }}</span>
+          </div>
+          <div class="card-actions">
+            <div class="thumbs" onclick="event.stopPropagation()">
+              <button class="thumb-btn{% if feedback == 'up' %} active-up{% endif %}"
+                      data-dir="up" title="Relevant">↑</button>
+              <button class="thumb-btn{% if feedback == 'down' %} active-down{% endif %}"
+                      data-dir="down" title="Not relevant">↓</button>
+            </div>
+            <span class="card-time">
+              {{ item.read_time_min|round(0)|int }}m
+              {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+            </span>
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+
+    </div>
+    {% endfor %}
+
+    {% endif %}
+  </div>
+
+  {# ── SIDEBAR ─────────────────────────────────────────────────────────── #}
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Today's digest</div>
+      <div class="sidebar-row">
+        <span class="sidebar-key">Items</span>
+        <span class="sidebar-val">{{ read_count }} / {{ total_items }} read</span>
+      </div>
+      <div class="sidebar-row">
+        <span class="sidebar-key">Read time</span>
+        <span class="sidebar-val">~{{ total_read_time }} min</span>
+      </div>
+      {% if pipeline_run %}
+      <div class="sidebar-row">
+        <span class="sidebar-key">Last run</span>
+        <span class="sidebar-val">{{ pipeline_run.started_at[:10] if pipeline_run.started_at else '—' }}</span>
+      </div>
+      <div class="sidebar-row">
+        <span class="sidebar-key">Fetched</span>
+        <span class="sidebar-val">{{ pipeline_run.items_fetched or 0 }}</span>
+      </div>
+      <div class="sidebar-row">
+        <span class="sidebar-key">Cost</span>
+        <span class="sidebar-val">${{ '%.3f'|format(pipeline_run.total_usd or 0) }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if top_sources %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Top sources</div>
+      {% for name, count in top_sources %}
+      <div class="sidebar-row">
+        <span class="sidebar-source">{{ name }}</span>
+        <span class="sidebar-count">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if top_companies %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Companies</div>
+      {% for name, count in top_companies %}
+      <div class="sidebar-row">
+        <span class="sidebar-source">{{ name }}</span>
+        <span class="sidebar-count">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if pipeline_run %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Pipeline</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--f4);line-height:1.9;">
+        <div>Run: {{ pipeline_run.started_at[11:16] if pipeline_run.started_at else '—' }}</div>
+        <div>Fetched: {{ pipeline_run.items_fetched or 0 }}</div>
+        <div>After dedup: {{ pipeline_run.items_after_dedup or 0 }}</div>
+        <div>Cost: ${{ '%.3f'|format(pipeline_run.total_usd or 0) }}</div>
+        <div style="color:{% if pipeline_run.status == 'complete' %}#2DC653{% else %}#F4A261{% endif %};margin-top:4px;">
+          ● {{ pipeline_run.status|title }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </aside>
+
+</div>
+
+{# ── DETAIL PANEL ──────────────────────────────────────────────────────── #}
+<div id="detail-overlay" class="detail-backdrop" style="display:none;" onclick="closeDetail()">
+  <div style="flex:1;background:rgba(10,10,11,0.6);backdrop-filter:blur(2px);"></div>
+  <div id="detail-panel" class="detail-panel slide-in" onclick="event.stopPropagation()" style="display:none;">
+    <div class="detail-header">
+      <div class="detail-meta-row" id="detail-meta-row"></div>
+      <button class="detail-close" onclick="closeDetail()">✕ ESC</button>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+    <div class="detail-footer">
+      <div class="thumbs" id="detail-thumbs"></div>
+      <a class="detail-link" id="detail-link" href="#" target="_blank" rel="noopener">Read original source →</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  // Inline detail data for fast open without fetch
+  const ITEMS = {{ items_json|safe }};
+  const itemMap = {};
+  ITEMS.forEach(it => itemMap[it.id] = it);
+
+  function openDetail(itemId) {
+    const item = itemMap[itemId];
+    if (!item) return;
+
+    const overlay = document.getElementById('detail-overlay');
+    const panel   = document.getElementById('detail-panel');
+    const metaRow = document.getElementById('detail-meta-row');
+    const body    = document.getElementById('detail-body');
+    const link    = document.getElementById('detail-link');
+    const thumbs  = document.getElementById('detail-thumbs');
+
+    const badgeClass = 'badge-' + (item.item_type || 'report');
+    const badgeLabel = (item.item_type || 'report').charAt(0).toUpperCase() + (item.item_type || 'report').slice(1);
+    const companies  = item.company_tags ? JSON.parse(item.company_tags) : [];
+
+    metaRow.innerHTML = `
+      <span class="badge ${badgeClass}">${badgeLabel}</span>
+      ${item.topic_tag ? `<span class="cat-tag">${item.topic_tag.toUpperCase()}</span>` : ''}
+      ${item.region_tag ? `<span class="region-pill">${item.region_tag}</span>` : ''}
+    `;
+
+    body.innerHTML = `
+      <h2 class="detail-title">${item.title_translated || item.title || ''}</h2>
+      <div class="detail-source-row">
+        <div class="avatar">${(item.source_name||'XX').slice(0,2).toUpperCase()}</div>
+        <div>
+          <div class="detail-source-name">${item.source_name || ''}</div>
+          <div class="detail-source-time">${item.read_time_min ? Math.round(item.read_time_min)+'m read' : ''} ${item.published_at ? '· '+item.published_at.slice(0,10) : ''}</div>
+        </div>
+      </div>
+      ${item.summary ? `<div class="detail-summary">${item.summary}</div>` : ''}
+      ${item.why_it_matters ? `
+        <div class="detail-why">
+          <div class="detail-why-label">Why it matters</div>
+          <div class="detail-why-text">${item.why_it_matters}</div>
+        </div>` : ''}
+      ${companies.length ? `
+        <div>
+          <div class="detail-companies-label">Companies</div>
+          <div class="card-companies">${companies.map(c=>`<span class="company-chip">${c}</span>`).join('')}</div>
+        </div>` : ''}
+    `;
+
+    const fb = item.user_feedback;
+    thumbs.innerHTML = `
+      <button class="thumb-btn${fb==='up'?' active-up':''}" data-dir="up" data-id="${item.id}" title="Relevant">↑</button>
+      <button class="thumb-btn${fb==='down'?' active-down':''}" data-dir="down" data-id="${item.id}" title="Not relevant">↓</button>
+    `;
+
+    link.href = item.url || '#';
+
+    overlay.style.display = 'flex';
+    panel.style.display   = 'flex';
+
+    // Mark read
+    fetch('/api/read', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name="csrf-token"]').content},
+      body: JSON.stringify({item_id: itemId}),
+    });
+    document.querySelectorAll(`.card[data-id="${itemId}"]`).forEach(c => {
+      c.classList.add('is-read');
+      const m = c.querySelector('.card-read-marker');
+      if (m) m.style.display = '';
+    });
+  }
+
+  window.closeDetail = function() {
+    document.getElementById('detail-overlay').style.display = 'none';
+    document.getElementById('detail-panel').style.display   = 'none';
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') window.closeDetail(); });
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.thumb-btn') || e.target.closest('.save-btn') || e.target.closest('a')) return;
+    const card = e.target.closest('.card[data-id]');
+    if (!card) return;
+    openDetail(card.dataset.id);
+  });
+})();
+</script>
+{% endblock %}

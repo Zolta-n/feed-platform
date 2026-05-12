@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+
+  <header class="nav">
+    <div class="nav-brand">
+      <a class="nav-logo" href="{{ url_for('digest.index') }}">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </a>
+      <span class="nav-tagline">Admin</span>
+    </div>
+    <nav class="nav-links">
+      <a class="nav-link" href="{{ url_for('digest.index') }}">← Digest</a>
+      <a class="nav-btn" href="{{ url_for('auth.logout') }}">Sign out</a>
+    </nav>
+  </header>
+
+  <div class="admin-layout">
+
+    <aside class="admin-sidebar">
+      <a class="admin-nav-item {% if active_section == 'dashboard' %}active{% endif %}"
+         href="{{ url_for('admin.index') }}">Dashboard</a>
+      <a class="admin-nav-item {% if active_section == 'users' %}active{% endif %}"
+         href="{{ url_for('admin.users') }}">Users</a>
+      <a class="admin-nav-item {% if active_section == 'sources' %}active{% endif %}"
+         href="{{ url_for('admin.sources') }}">Sources</a>
+      <a class="admin-nav-item {% if active_section == 'watchlist' %}active{% endif %}"
+         href="{{ url_for('admin.watchlist') }}">Watchlist</a>
+      <a class="admin-nav-item {% if active_section == 'costs' %}active{% endif %}"
+         href="{{ url_for('admin.costs') }}">Costs</a>
+    </aside>
+
+    <div class="admin-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      {% block admin_content %}{% endblock %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

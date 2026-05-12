@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ current_user.theme_color if current_user and current_user.is_authenticated else 'red' }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ feed_name }}{% endblock %} — {{ feed_tagline }}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='niche.css') }}?v={{ static_version }}">
+
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div style="position:fixed;top:52px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:360px;">
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
+{% block body %}{% endblock %}
+
+<script src="{{ url_for('static', filename='niche.js') }}?v={{ static_version }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

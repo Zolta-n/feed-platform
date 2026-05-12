@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Sign in — {{ feed_name }}{% endblock %}
+{% block body_class %}{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="auth-logo">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </div>
+      <div class="auth-logo-tagline">{{ feed_tagline }}</div>
+    </div>
+
+    <div class="auth-title">Request access</div>
+    <div class="auth-sub">Invite-only. Enter your work email to request access. Admin approval required — you'll receive a sign-in link within 24h.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('auth.request_login') }}" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="form-group">
+        <input class="auth-input"
+               type="email"
+               name="email"
+               placeholder="you@company.com"
+               value="{{ form.email.data or '' }}"
+               autocomplete="email"
+               autofocus
+               required
+               onfocus="this.style.borderColor='var(--accent)'"
+               onblur="this.style.borderColor='var(--b)'">
+        {% if form.email.errors %}
+          <div class="form-error">{{ form.email.errors[0] }}</div>
+        {% endif %}
+      </div>
+      <button class="auth-btn" type="submit"
+              onmouseenter="this.style.opacity=0.88"
+              onmouseleave="this.style.opacity=1">
+        Request Access
+      </button>
+    </form>
+
+    <div class="auth-note">GDPR-compliant · EU data residency · Invite-only</div>
+
+  </div>
+</div>
+{% endblock %}

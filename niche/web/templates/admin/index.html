@@ -1,0 +1,141 @@
+{% extends "admin/base.html" %}
+{% set active_section = 'dashboard' %}
+
+{% block admin_content %}
+<div class="admin-section-title">Dashboard</div>
+
+{# ── STATS GRID ──────────────────────────────────────────────────────────── #}
+<div class="admin-grid">
+  <div class="admin-card">
+    <div class="admin-card-title">Users</div>
+    <div class="admin-stat">{{ user_count }}</div>
+    <div class="admin-stat-sub">{{ pending_count }} pending approval</div>
+  </div>
+  <div class="admin-card">
+    <div class="admin-card-title">Sources</div>
+    <div class="admin-stat">{{ source_count }}</div>
+    <div class="admin-stat-sub">{{ unhealthy_count }} unhealthy</div>
+  </div>
+  <div class="admin-card">
+    <div class="admin-card-title">Items (total)</div>
+    <div class="admin-stat">{{ item_count }}</div>
+    <div class="admin-stat-sub">in database</div>
+  </div>
+  <div class="admin-card">
+    <div class="admin-card-title">Cost this month</div>
+    <div class="admin-stat">${{ '%.2f'|format(month_cost) }}</div>
+    <div class="admin-stat-sub">of $20.00 budget</div>
+  </div>
+</div>
+
+{# ── PIPELINE ────────────────────────────────────────────────────────────── #}
+<div style="margin-bottom:24px;">
+  <div class="admin-section-title" style="font-size:12px;margin-bottom:12px;">Pipeline</div>
+
+  {% if latest_run %}
+  <div class="admin-card" style="margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div>
+        <span class="status-dot status-{% if latest_run.status == 'complete' %}ok{% elif latest_run.status == 'failed' %}error{% else %}warn{% endif %}"></span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--f2);">
+          {{ latest_run.status|title }} · {{ latest_run.started_at[:10] if latest_run.started_at else '—' }}
+          {{ latest_run.started_at[11:16] if latest_run.started_at else '' }}
+        </span>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--f4);">
+        {{ latest_run.items_fetched or 0 }} fetched →
+        {{ latest_run.items_after_dedup or 0 }} deduped →
+        {{ latest_run.items_in_digest or 0 }} in digest ·
+        ${{ '%.3f'|format(latest_run.total_usd or 0) }}
+      </span>
+    </div>
+    {% if latest_run.error_message %}
+      <div style="font-family:var(--mono);font-size:10px;color:#E63946;margin-top:4px;">{{ latest_run.error_message }}</div>
+    {% endif %}
+    {% if latest_run.status == 'running' and latest_run.id %}
+      <div id="run-status" data-run-id="{{ latest_run.id }}"
+           style="font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:8px;">
+        Running… {{ latest_run.current_stage or '' }}
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <form method="post" action="{{ url_for('admin.run_pipeline') }}" style="display:inline;">
+      {{ csrf_token_field }}
+      <button class="admin-btn admin-btn-accent" type="submit">▶ Run pipeline now</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.send_digest') }}" style="display:inline;">
+      {{ csrf_token_field }}
+      <button class="admin-btn" type="submit">✉ Send digest email</button>
+    </form>
+  </div>
+</div>
+
+{# ── SCHEDULE ────────────────────────────────────────────────────────────── #}
+<div style="margin-bottom:24px;">
+  <div class="admin-section-title" style="font-size:12px;margin-bottom:12px;">Schedule</div>
+  <div class="admin-card">
+    <form method="post" action="{{ url_for('admin.set_schedule') }}" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      {{ csrf_token_field }}
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Run time (HH:MM, 24h)</label>
+        <input class="form-input" style="width:120px;" type="text" name="run_time"
+               value="{{ scheduler_run_time or '05:00' }}" placeholder="05:00">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">Timezone</label>
+        <input class="form-input" style="width:160px;" type="text" name="timezone"
+               value="{{ scheduler_timezone or 'Europe/Berlin' }}" placeholder="Europe/Berlin">
+      </div>
+      <button class="admin-btn" type="submit">Save schedule</button>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--f4);align-self:center;">
+        Next run: {{ next_run or '—' }}
+        <span style="color:{% if scheduler_running %}#2DC653{% else %}#F4A261{% endif %};margin-left:8px;">
+          ● {{ 'Scheduler active' if scheduler_running else 'Scheduler inactive' }}
+        </span>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── RECENT RUNS ─────────────────────────────────────────────────────────── #}
+{% if recent_runs %}
+<div>
+  <div class="admin-section-title" style="font-size:12px;margin-bottom:12px;">Recent runs</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date/Time</th>
+          <th>Status</th>
+          <th>Fetched</th>
+          <th>Deduped</th>
+          <th>Digest</th>
+          <th>Cost</th>
+          <th>Stage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in recent_runs %}
+        <tr>
+          <td>{{ run.started_at[:16] if run.started_at else '—' }}</td>
+          <td>
+            <span class="status-dot status-{% if run.status == 'complete' %}ok{% elif run.status == 'failed' %}error{% else %}warn{% endif %}"></span>
+            {{ run.status }}
+          </td>
+          <td>{{ run.items_fetched or 0 }}</td>
+          <td>{{ run.items_after_dedup or 0 }}</td>
+          <td>{{ run.items_in_digest or 0 }}</td>
+          <td>${{ '%.3f'|format(run.total_usd or 0) }}</td>
+          <td style="color:var(--f4);">{{ run.current_stage or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

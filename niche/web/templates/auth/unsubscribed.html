@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Unsubscribed — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </div>
+      <div class="auth-logo-tagline">{{ feed_tagline }}</div>
+    </div>
+    <div class="auth-success" style="color:var(--f2);">Email digest disabled</div>
+    <div class="auth-sub">You've been unsubscribed from the daily email digest. You can re-enable it any time from your <a href="{{ url_for('preferences.index') }}" style="color:var(--accent);">preferences</a>.</div>
+  </div>
+</div>
+{% endblock %}

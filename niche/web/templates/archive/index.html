@@ -1,0 +1,72 @@
+{% extends "app_base.html" %}
+{% block title %}Archive — {{ feed_name }}{% endblock %}
+
+{% block app_content %}
+<div style="flex:1;overflow-y:auto;padding:24px;">
+  <div style="max-width:900px;margin:0 auto;">
+
+    <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--f1);margin-bottom:20px;">Archive</div>
+
+    <form method="get" action="{{ url_for('archive.index') }}" class="archive-filters">
+      <input class="form-input" type="text" name="q" placeholder="Search…"
+             value="{{ q or '' }}" style="width:220px;">
+      <input class="form-input" type="date" name="from" value="{{ date_from or '' }}" style="width:140px;">
+      <input class="form-input" type="date" name="to"   value="{{ date_to or '' }}"   style="width:140px;">
+      <select class="pref-select" name="topic">
+        <option value="">All topics</option>
+        {% if taxonomy %}
+          {% for topic in taxonomy.topics %}
+          <option value="{{ topic.id }}" {% if topic_filter == topic.id %}selected{% endif %}>{{ topic.label }}</option>
+          {% endfor %}
+        {% endif %}
+      </select>
+      <button class="admin-btn" type="submit">Filter</button>
+      {% if q or date_from or date_to or topic_filter %}
+        <a class="admin-btn" href="{{ url_for('archive.index') }}">Clear</a>
+      {% endif %}
+    </form>
+
+    <div class="archive-count">
+      {{ items|length }} item{{ 's' if items|length != 1 }}
+      {% if q %} matching "{{ q }}"{% endif %}
+    </div>
+
+    {% for item in items %}
+    {% set companies = item.company_tags|fromjson if item.company_tags else [] %}
+    <div class="card" data-id="{{ item.id }}">
+      <div class="card-top">
+        <span class="badge badge-{{ item.item_type or 'report' }}">{{ item.item_type|title if item.item_type else 'Report' }}</span>
+        <span class="cat-tag">{{ item.topic_tag|upper if item.topic_tag else '' }}</span>
+        {% if item.region_tag %}<span class="region-pill">{{ item.region_tag }}</span>{% endif %}
+        <span style="margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--f5);">
+          {{ item.published_at[:10] if item.published_at else item.fetched_at[:10] if item.fetched_at else '' }}
+        </span>
+      </div>
+      <div class="card-title">{{ item.title_translated or item.title or '' }}</div>
+      {% if item.summary %}
+      <div class="card-summary">{{ item.summary }}</div>
+      {% endif %}
+      <div class="card-footer">
+        <div class="card-source">
+          <div class="avatar">{{ (item.source_name or 'XX')[:2]|upper }}</div>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--f4);">{{ item.source_name or '' }}</span>
+        </div>
+        {% if companies %}
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          {% for c in companies[:4] %}
+          <span class="company-chip">{{ c }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-title">No items found</div>
+      <div class="empty-state-sub">Try adjusting your filters</div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+# EP1 CI deny list — strings that must NOT appear in niche/core/ or niche/web/
+# These are brake-by-wire domain-specific strings; they belong in feeds/brake-by-wire/ only.
+# Lines starting with # are comments. Blank lines are ignored.
+
+brake-by-wire
+brake by wire
+brembo
+knorr-bremse
+hitachi astemo
+continental ag
+bosch automotive
+zf friedrichshafen
+mando corporation
+hyundai mobis
+advics
+nexteer
+tier-2 supplier
+actuator supplier
+bbw
+by-wire actuator

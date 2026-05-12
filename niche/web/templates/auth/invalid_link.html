@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Invalid link — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </div>
+      <div class="auth-logo-tagline">{{ feed_tagline }}</div>
+    </div>
+    <div style="font-family:var(--mono);font-size:14px;color:#E63946;">✕ Invalid or expired link</div>
+    <div class="auth-sub">This sign-in link has expired or already been used. Links are valid for 15 minutes and single-use.</div>
+    <a class="auth-btn" href="{{ url_for('auth.request_login') }}" style="text-align:center;display:block;">
+      Request a new link
+    </a>
+  </div>
+</div>
+{% endblock %}

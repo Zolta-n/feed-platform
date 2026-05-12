@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ feed_name }} — {{ date }}</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a0b;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0a0a0b;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+  {# ── HEADER ──────────────────────────────────────────────────────────── #}
+  <tr>
+    <td style="background:#111113;border:1px solid #2a2a2f;border-radius:8px 8px 0 0;padding:24px 32px;border-bottom:1px solid #2a2a2f;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#f4f4f5;letter-spacing:0.04em;">{{ feed_name }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;letter-spacing:0.12em;text-transform:uppercase;margin-left:10px;">{{ feed_tagline }}</span>
+          </td>
+          <td align="right">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#71717a;letter-spacing:0.06em;">{{ date }}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  {# ── META ─────────────────────────────────────────────────────────────── #}
+  <tr>
+    <td style="background:#111113;border:1px solid #2a2a2f;border-top:none;padding:12px 32px;border-bottom:1px solid #2a2a2f;">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;letter-spacing:0.1em;">
+        {{ cards|length }} ITEMS &nbsp;·&nbsp; ~{{ total_read_time|round(0)|int }} MIN READ
+      </span>
+    </td>
+  </tr>
+
+  {# ── CLUSTERS ─────────────────────────────────────────────────────────── #}
+  {% for cluster in cluster_map %}
+  <tr>
+    <td style="background:#111113;border:1px solid #2a2a2f;border-top:none;padding:24px 32px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:{{ accent_color }};padding-bottom:12px;">
+            {{ cluster.label }}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  {% set cluster_cards = [] %}
+  {% for card in cards %}
+    {% if card.cluster_label == cluster.label %}
+      {% set _ = cluster_cards.append(card) %}
+    {% endif %}
+  {% endfor %}
+
+  {% for card in cluster_cards %}
+  {% set badge_styles = {
+    'breaking':  ('rgba(244,162,97,0.15)', '#F4A261'),
+    'analysis':  ('rgba(67,97,238,0.15)',  '#4361EE'),
+    'report':    ('rgba(230,57,70,0.15)',   '#E63946'),
+    'exclusive': ('rgba(45,198,83,0.15)',   '#2DC653'),
+  } %}
+  {% set badge = badge_styles.get(card.item_type or 'report', badge_styles['report']) %}
+  <tr>
+    <td style="background:#111113;border:1px solid #2a2a2f;border-top:none;padding:0 32px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#18181b;border:1px solid #2a2a2f;border-radius:6px;padding:14px 16px;">
+        <tr><td>
+          {# Badge + category #}
+          <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
+            <tr>
+              <td style="background:{{ badge[0] }};border-radius:3px;padding:2px 6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:{{ badge[1] }};">{{ card.item_type|title if card.item_type else 'Report' }}</span>
+              </td>
+              {% if card.topic_tag %}
+              <td style="padding-left:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:#3f3f46;">{{ card.topic_tag|upper }}</span>
+              </td>
+              {% endif %}
+              {% if card.region_tag %}
+              <td style="padding-left:6px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#3f3f46;border:1px solid #2a2a2f;border-radius:3px;padding:1px 5px;">{{ card.region_tag }}</span>
+              </td>
+              {% endif %}
+            </tr>
+          </table>
+          {# Title with link #}
+          <p style="font-family:'IBM Plex Sans',Helvetica,sans-serif;font-size:14px;font-weight:600;color:#f4f4f5;line-height:1.35;margin:0 0 8px;">
+            <a href="{{ card.url or '#' }}" style="color:#f4f4f5;text-decoration:none;">{{ card.title_translated or card.title or '' }}</a>
+          </p>
+          {# Summary #}
+          {% if card.summary %}
+          <p style="font-family:'IBM Plex Sans',Helvetica,sans-serif;font-size:12px;color:#a1a1aa;line-height:1.6;margin:0 0 10px;">{{ card.summary }}</p>
+          {% endif %}
+          {# Why it matters #}
+          {% if card.why_it_matters %}
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-left:2px solid {{ accent_color }};padding-left:8px;margin-bottom:10px;">
+            <tr><td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#71717a;line-height:1.5;padding-left:8px;">{{ card.why_it_matters }}</td></tr>
+          </table>
+          {% endif %}
+          {# Footer #}
+          <p style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;margin:0;">
+            {{ card.source_name or '' }}
+            {% if card.read_time_min %} · {{ card.read_time_min|round(0)|int }}m{% endif %}
+            &nbsp;·&nbsp;
+            <a href="{{ read_url_base }}/item/{{ card.id }}" style="color:{{ accent_color }};text-decoration:none;">Read in app →</a>
+          </p>
+        </td></tr>
+      </table>
+    </td>
+  </tr>
+  {% endfor %}
+  {% endfor %}
+
+  {# ── FOOTER ───────────────────────────────────────────────────────────── #}
+  <tr>
+    <td style="background:#0a0a0b;border:1px solid #2a2a2f;border-top:none;border-radius:0 0 8px 8px;padding:20px 32px;text-align:center;">
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;margin:0;letter-spacing:0.06em;">
+        {{ feed_name }} &nbsp;·&nbsp; {{ feed_tagline }}
+        &nbsp;·&nbsp;
+        <a href="{{ app_url }}" style="color:#3f3f46;text-decoration:underline;">Open app</a>
+        &nbsp;·&nbsp;
+        <a href="{{ unsubscribe_url }}" style="color:#3f3f46;text-decoration:underline;">Unsubscribe</a>
+      </p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

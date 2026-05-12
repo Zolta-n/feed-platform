@@ -1,0 +1,11 @@
+<div class="empty-state" style="height:300px;padding-top:40px;">
+  <div style="font-family:var(--mono);font-size:32px;color:var(--f5);margin-bottom:16px;">—</div>
+  <div class="empty-state-title">No digest for {{ date }}</div>
+  <div class="empty-state-sub">
+    {% if current_user and current_user.is_admin %}
+      Run the pipeline from the <a href="{{ url_for('admin.index') }}" style="color:var(--accent);">admin dashboard</a> to generate today's digest.
+    {% else %}
+      Check back after the daily pipeline runs.
+    {% endif %}
+  </div>
+</div>

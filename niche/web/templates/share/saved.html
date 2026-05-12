@@ -1,0 +1,43 @@
+{% extends "app_base.html" %}
+{% block title %}Saved — {{ feed_name }}{% endblock %}
+
+{% block app_content %}
+<div style="flex:1;overflow-y:auto;padding:24px;">
+  <div style="max-width:780px;margin:0 auto;">
+
+    <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--f1);margin-bottom:20px;">Saved items</div>
+
+    {% for item in items %}
+    {% set companies = item.company_tags|fromjson if item.company_tags else [] %}
+    <div class="card" data-id="{{ item.id }}">
+      <div class="card-top">
+        <span class="badge badge-{{ item.item_type or 'report' }}">{{ item.item_type|title if item.item_type else 'Report' }}</span>
+        <span class="cat-tag">{{ item.topic_tag|upper if item.topic_tag else '' }}</span>
+        {% if item.region_tag %}<span class="region-pill">{{ item.region_tag }}</span>{% endif %}
+      </div>
+      <div class="card-title">{{ item.title_translated or item.title or '' }}</div>
+      {% if item.summary %}
+      <div class="card-summary">{{ item.summary }}</div>
+      {% endif %}
+      <div class="card-footer">
+        <div class="card-source">
+          <div class="avatar">{{ (item.source_name or 'XX')[:2]|upper }}</div>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--f4);">{{ item.source_name or '' }}</span>
+        </div>
+        <button class="save-btn saved" data-id="{{ item.id }}" title="Remove from saved"
+                style="background:none;border:none;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--f3);"
+                onclick="event.stopPropagation()">
+          ✕ unsave
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-title">No saved items</div>
+      <div class="empty-state-sub">Save items from the digest for later reference</div>
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+{% endblock %}

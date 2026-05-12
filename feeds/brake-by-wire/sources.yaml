@@ -1,0 +1,12 @@
+sources:
+  - id: gdelt-main
+    type: gdelt
+    name: "GDELT Global News"
+    source_weight: 0.8
+    enabled: true
+
+  - id: google-news-main
+    type: google_news
+    name: "Google News"
+    source_weight: 0.9
+    enabled: true

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title_translated or item.title or 'Item' }} — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="auth-page" style="align-items:flex-start;padding-top:60px;">
+<div class="public-item-page">
+
+  <div style="margin-bottom:20px;">
+    <div class="nav-logo" style="font-size:14px;font-weight:700;">
+      {{ feed_name[:len(feed_name)//2] }}<span class="accent" style="color:var(--accent);">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+    </div>
+    <div class="nav-tagline" style="font-family:var(--mono);font-size:9px;color:var(--f5);letter-spacing:0.1em;text-transform:uppercase;">{{ feed_tagline }}</div>
+  </div>
+
+  <div class="public-item-card">
+    {% set companies = item.company_tags|fromjson if item.company_tags else [] %}
+
+    <div class="card-top">
+      <span class="badge badge-{{ item.item_type or 'report' }}">{{ item.item_type|title if item.item_type else 'Report' }}</span>
+      {% if item.topic_tag %}<span class="cat-tag">{{ item.topic_tag|upper }}</span>{% endif %}
+      {% if item.region_tag %}<span class="region-pill">{{ item.region_tag }}</span>{% endif %}
+    </div>
+
+    <h1 class="detail-title" style="font-size:20px;">{{ item.title_translated or item.title or '' }}</h1>
+
+    <div class="detail-source-row">
+      <div class="avatar">{{ (item.source_name or 'XX')[:2]|upper }}</div>
+      <div>
+        <div class="detail-source-name">{{ item.source_name or '' }}</div>
+        <div class="detail-source-time">
+          {% if item.read_time_min %}{{ item.read_time_min|round(0)|int }}m read{% endif %}
+          {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if item.summary %}
+    <div class="detail-summary">{{ item.summary }}</div>
+    {% endif %}
+
+    {% if item.why_it_matters %}
+    <div class="detail-why">
+      <div class="detail-why-label">Why it matters</div>
+      <div class="detail-why-text">{{ item.why_it_matters }}</div>
+    </div>
+    {% endif %}
+
+    {% if companies %}
+    <div>
+      <div class="detail-companies-label">Companies</div>
+      <div class="card-companies">{% for c in companies %}<span class="company-chip">{{ c }}</span>{% endfor %}</div>
+    </div>
+    {% endif %}
+
+    {% if item.url %}
+    <a class="detail-link" href="{{ item.url }}" target="_blank" rel="noopener">Read original source →</a>
+    {% endif %}
+  </div>
+
+  <div style="margin-top:16px;font-family:var(--mono);font-size:9px;color:var(--f5);text-align:center;">
+    Shared via {{ feed_name }} · <a href="{{ url_for('auth.request_login') }}" style="color:var(--accent);">Request access</a>
+  </div>
+
+</div>
+</div>
+{% endblock %}

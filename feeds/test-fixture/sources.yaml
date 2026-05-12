@@ -1,0 +1,27 @@
+sources:
+  - id: stub-tier1
+    type: stub
+    name: "AcmeBrake Press"
+    default_region: europe
+    default_topic: tier1
+    source_weight: 1.5
+    enabled: true
+    item_count: 3
+
+  - id: stub-oem
+    type: stub
+    name: "FakeTier1Co News"
+    default_region: asia
+    default_topic: oem
+    source_weight: 1.0
+    enabled: true
+    item_count: 2
+
+  - id: stub-regulation
+    type: stub
+    name: "SyntheticRegulator Feed"
+    default_region: europe
+    default_topic: regulation
+    source_weight: 0.9
+    enabled: true
+    item_count: 2

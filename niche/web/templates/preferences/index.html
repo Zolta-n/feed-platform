@@ -1,0 +1,159 @@
+{% extends "app_base.html" %}
+{% block title %}Preferences — {{ feed_name }}{% endblock %}
+
+{% block app_content %}
+<div style="flex:1;overflow-y:auto;">
+<div class="pref-page">
+
+  <div class="pref-title">Preferences</div>
+  <div class="pref-subtitle">Adjust how your digest is ranked and filtered. Changes take effect on the next daily run.</div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post" action="{{ url_for('preferences.index') }}" novalidate>
+    {{ form.hidden_tag() }}
+
+    {# ── THEME COLOR ──────────────────────────────────────────────────────── #}
+    <div class="pref-section">
+      <div class="pref-section-label">Accent color</div>
+      <div class="pref-row">
+        <span class="pref-row-label">Theme color</span>
+        <div class="theme-swatches">
+          {% set theme_colors = [
+            ('red',    '#E63946'),
+            ('blue',   '#4361EE'),
+            ('amber',  '#F4A261'),
+            ('teal',   '#0d9488'),
+            ('purple', '#7c3aed'),
+          ] %}
+          {% for color_id, color_hex in theme_colors %}
+          <button type="button"
+                  class="theme-swatch {% if (prefs.theme_color or 'red') == color_id %}active{% endif %}"
+                  data-color="{{ color_id }}"
+                  style="background:{{ color_hex }};"
+                  title="{{ color_id|title }}"></button>
+          {% endfor %}
+        </div>
+      </div>
+      <input type="hidden" name="theme_color" id="theme_color_input" value="{{ prefs.theme_color or 'red' }}">
+    </div>
+
+    {# ── REGION WEIGHTS ───────────────────────────────────────────────────── #}
+    {% if taxonomy and taxonomy.regions %}
+    <div class="pref-section">
+      <div class="pref-section-label">Region weights</div>
+      {% for region in taxonomy.regions %}
+      {% set w = (region_weights.get(region.id, 1.0) if region_weights else 1.0)|float %}
+      <div class="pref-row">
+        <span class="pref-row-label">{{ region.label }}</span>
+        <div class="pref-slider-wrap">
+          <input class="pref-slider" type="range" min="0" max="2" step="0.1"
+                 name="region_{{ region.id }}" value="{{ w }}">
+          <span class="pref-slider-val">{{ '%.1f'|format(w) }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── TOPIC WEIGHTS ────────────────────────────────────────────────────── #}
+    {% if taxonomy and taxonomy.topics %}
+    <div class="pref-section">
+      <div class="pref-section-label">Topic weights</div>
+      {% for topic in taxonomy.topics %}
+      {% set w = (topic_weights.get(topic.id, 1.0) if topic_weights else 1.0)|float %}
+      <div class="pref-row">
+        <span class="pref-row-label">{{ topic.label }}</span>
+        <div class="pref-slider-wrap">
+          <input class="pref-slider" type="range" min="0" max="3" step="0.1"
+                 name="topic_{{ topic.id }}" value="{{ w }}">
+          <span class="pref-slider-val">{{ '%.1f'|format(w) }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── EMAIL SETTINGS ───────────────────────────────────────────────────── #}
+    <div class="pref-section">
+      <div class="pref-section-label">Email digest</div>
+      <div class="pref-row">
+        <span class="pref-row-label">Send time (HH:MM)</span>
+        <input class="pref-input" type="text" name="email_send_time"
+               value="{{ current_user.email_send_time or '06:30' }}" style="width:100px;">
+      </div>
+      <div class="pref-row">
+        <span class="pref-row-label">Max items per digest</span>
+        <input class="pref-input" type="number" name="email_item_count" min="5" max="30"
+               value="{{ current_user.email_item_count or 15 }}" style="width:80px;">
+      </div>
+      <div class="pref-row">
+        <span class="pref-row-label">Email digest enabled</span>
+        <input type="checkbox" name="email_enabled" value="1"
+               {% if current_user.email_enabled %}checked{% endif %}
+               style="accent-color:var(--accent);width:16px;height:16px;">
+      </div>
+    </div>
+
+    {# ── KEYWORD BOOSTS ───────────────────────────────────────────────────── #}
+    <div class="pref-section">
+      <div class="pref-section-label">Keyword boosts</div>
+      <div class="pref-row">
+        <span class="pref-row-label">Boost keywords (comma-separated)</span>
+        <input class="pref-input" type="text" name="keyword_boosts"
+               value="{{ keyword_boosts_str or '' }}"
+               placeholder="brake actuator, EPB, redundancy"
+               style="width:280px;">
+      </div>
+    </div>
+
+    {# ── KEYWORD BLOCKS ───────────────────────────────────────────────────── #}
+    <div class="pref-section">
+      <div class="pref-section-label">Keyword blocks</div>
+      <div class="pref-row">
+        <span class="pref-row-label">Block keywords (comma-separated)</span>
+        <input class="pref-input" type="text" name="keyword_blocks"
+               value="{{ keyword_blocks_str or '' }}"
+               placeholder="used car, aftermarket"
+               style="width:280px;">
+      </div>
+    </div>
+
+    <button class="pref-save-btn" type="submit">Save preferences</button>
+  </form>
+
+  {# ── GDPR ─────────────────────────────────────────────────────────────── #}
+  <div class="pref-section" style="margin-top:48px;padding-top:24px;border-top:1px solid var(--b);">
+    <div class="pref-section-label">Account</div>
+    <div class="pref-row">
+      <span class="pref-row-label">Export my data</span>
+      <a class="admin-btn" href="/api/export">Download JSON</a>
+    </div>
+    <div class="pref-row">
+      <span class="pref-row-label">Delete account</span>
+      <form method="post" action="/api/delete-account" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="admin-btn admin-btn-danger" type="submit"
+                data-confirm="Permanently delete your account and all data?">Delete account</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update hidden theme_color field when swatch is clicked
+document.querySelectorAll('.theme-swatch').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.getElementById('theme_color_input').value = this.dataset.color;
+  });
+});
+</script>
+{% endblock %}

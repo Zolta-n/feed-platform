@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Check your email — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="auth-logo">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </div>
+      <div class="auth-logo-tagline">{{ feed_tagline }}</div>
+    </div>
+
+    <div class="auth-success">✓ {{ link }} link sent</div>
+    <div class="auth-sub">
+      Check your inbox. Your link expires in 15 minutes.
+      {% if pending_approval %}
+        <br><br>Your account is pending admin approval — you'll receive a separate email when approved.
+      {% endif %}
+    </div>
+
+    <div class="auth-note">Didn't receive it? <a href="{{ url_for('auth.request_login') }}" style="color:var(--accent);">Try again</a></div>
+
+  </div>
+</div>
+{% endblock %}

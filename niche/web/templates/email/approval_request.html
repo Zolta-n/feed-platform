@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>New access request — {{ feed_name }}</title></head>
+<body style="margin:0;padding:0;background:#0a0a0b;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0a0a0b;padding:40px 0;">
+  <tr><td align="center">
+    <table width="520" cellpadding="0" cellspacing="0" border="0" style="background:#111113;border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;">
+      <tr><td style="padding:28px 32px;border-bottom:1px solid #2a2a2f;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#f4f4f5;">{{ feed_name }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;letter-spacing:0.12em;text-transform:uppercase;margin-left:10px;">Admin</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:#f4f4f5;margin:0 0 12px;">New access request</p>
+        <p style="font-size:14px;color:#a1a1aa;margin:0 0 8px;">
+          <strong style="color:#f4f4f5;">{{ email }}</strong> has requested access to {{ feed_name }}.
+        </p>
+        <p style="font-size:13px;color:#71717a;margin:0 0 28px;">Click the button below to approve their account.</p>
+        <table cellpadding="0" cellspacing="0" border="0">
+          <tr><td style="border-radius:3px;background:{{ accent_color }};">
+            <a href="{{ approval_url }}" style="display:inline-block;padding:11px 24px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#fff;text-decoration:none;">
+              Approve access
+            </a>
+          </td></tr>
+        </table>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3f3f46;margin:20px 0 0;word-break:break-all;">
+          Or: {{ approval_url }}
+        </p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

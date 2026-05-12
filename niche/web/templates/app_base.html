@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="app-shell">
+
+  {# ── TOP NAV ──────────────────────────────────────────────────────────── #}
+  <header class="nav">
+    <div class="nav-brand">
+      <a class="nav-logo" href="{{ url_for('digest.index') }}">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </a>
+      <span class="nav-tagline">{{ feed_tagline }}</span>
+    </div>
+
+    {% block nav_center %}{% endblock %}
+
+    <nav class="nav-links">
+      {% block nav_links %}
+      <a class="nav-link" href="{{ url_for('archive.index') }}">Archive</a>
+      <a class="nav-link" href="{{ url_for('preferences.index') }}">Preferences</a>
+      {% if current_user.is_admin %}
+        <a class="nav-link" href="{{ url_for('admin.index') }}">Admin</a>
+      {% endif %}
+      <a class="nav-btn" href="{{ url_for('auth.logout') }}">Sign out</a>
+      {% endblock %}
+    </nav>
+  </header>
+
+  {% block after_nav %}{% endblock %}
+
+  {% block app_content %}{% endblock %}
+
+</div>
+{% endblock %}

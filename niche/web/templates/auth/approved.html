@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Account approved — {{ feed_name }}{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-logo">
+        {{ feed_name[:len(feed_name)//2] }}<span class="accent">{{ feed_name[len(feed_name)//2:len(feed_name)//2+2] }}</span>{{ feed_name[len(feed_name)//2+2:] }}
+      </div>
+      <div class="auth-logo-tagline">{{ feed_tagline }}</div>
+    </div>
+    <div class="auth-success">✓ Account approved</div>
+    <div class="auth-sub">Your access has been approved. Request a sign-in link to continue.</div>
+    <a class="auth-btn" href="{{ url_for('auth.request_login') }}" style="text-align:center;display:block;">
+      Sign in
+    </a>
+  </div>
+</div>
+{% endblock %}

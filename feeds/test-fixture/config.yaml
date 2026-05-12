@@ -1,0 +1,10 @@
+feed_id: test-fixture
+name: TestFeed
+tagline: "Synthetic test feed"
+accent_color: "#4361EE"
+logo_path: null
+ui_languages: ["en"]
+default_ui_language: en
+timezone: UTC
+daily_run_time: "05:00"
+from_email: "test@localhost"

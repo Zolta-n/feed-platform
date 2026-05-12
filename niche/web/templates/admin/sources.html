@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% set active_section = 'sources' %}
+
+{% block admin_content %}
+<div class="admin-section-title">Sources</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Last fetch</th>
+        <th>Failures</th>
+        <th>Weight</th>
+        <th>Enabled</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for source in sources %}
+      {% set health = source_health.get(source.id, {}) %}
+      <tr>
+        <td style="color:var(--f1);">{{ source.name }}</td>
+        <td>{{ source.source_type }}</td>
+        <td>
+          {% if health.get('is_flagged') %}
+            <span class="status-dot status-error"></span> Flagged
+          {% elif source.consecutive_failures and source.consecutive_failures > 0 %}
+            <span class="status-dot status-warn"></span> {{ source.consecutive_failures }} failures
+          {% else %}
+            <span class="status-dot status-ok"></span> OK
+          {% endif %}
+        </td>
+        <td>{{ source.last_fetch_at[:16] if source.last_fetch_at else '—' }}</td>
+        <td>{{ source.consecutive_failures or 0 }}</td>
+        <td>{{ source.source_weight }}</td>
+        <td>{{ '✓' if source.enabled else '—' }}</td>
+      </tr>
+      {% if health.get('last_error_message') %}
+      <tr>
+        <td colspan="7" style="font-family:var(--mono);font-size:9px;color:#E63946;padding:4px 12px 10px;">
+          ↳ {{ health['last_error_message'] }}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

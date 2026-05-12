@@ -1,0 +1,93 @@
+{% extends "admin/base.html" %}
+{% set active_section = 'users' %}
+
+{% block admin_content %}
+<div class="admin-section-title">Users</div>
+
+{% if pending_users %}
+<div style="margin-bottom:24px;">
+  <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#F4A261;margin-bottom:12px;">
+    ● {{ pending_users|length }} pending approval
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Requested</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in pending_users %}
+        <tr>
+          <td>{{ user.email }}</td>
+          <td>{{ user.created_at[:10] if user.created_at else '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.approve_user', user_id=user.id) }}" style="display:inline;">
+              {{ csrf_token_field }}
+              <button class="admin-btn admin-btn-accent" type="submit">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline;margin-left:6px;">
+              {{ csrf_token_field }}
+              <button class="admin-btn admin-btn-danger" type="submit"
+                      data-confirm="Delete {{ user.email }}?">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div>
+  <div style="font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--f4);margin-bottom:12px;">
+    All users ({{ all_users|length }})
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Admin</th>
+          <th>Created</th>
+          <th>Last seen</th>
+          <th>Email</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in all_users %}
+        <tr>
+          <td>{{ user.email }}</td>
+          <td>
+            <span class="status-dot status-{% if user.is_approved %}ok{% else %}warn{% endif %}"></span>
+            {{ 'Approved' if user.is_approved else 'Pending' }}
+          </td>
+          <td>{{ '✓' if user.is_admin else '—' }}</td>
+          <td>{{ user.created_at[:10] if user.created_at else '—' }}</td>
+          <td>{{ user.last_seen_at[:10] if user.last_seen_at else '—' }}</td>
+          <td>{{ '✓' if user.email_enabled else '—' }}</td>
+          <td>
+            {% if not user.is_approved %}
+            <form method="post" action="{{ url_for('admin.approve_user', user_id=user.id) }}" style="display:inline;">
+              {{ csrf_token_field }}
+              <button class="admin-btn admin-btn-accent" type="submit">Approve</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline;margin-left:4px;">
+              {{ csrf_token_field }}
+              <button class="admin-btn admin-btn-danger" type="submit"
+                      data-confirm="Delete {{ user.email }} and all their data?">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

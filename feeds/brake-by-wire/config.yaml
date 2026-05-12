@@ -1,0 +1,10 @@
+feed_id: brake-by-wire
+name: BrakeByWire
+tagline: "Industry Intelligence"
+accent_color: "#E63946"
+logo_path: null
+ui_languages: ["en", "de"]
+default_ui_language: en
+timezone: Europe/Berlin
+daily_run_time: "05:00"
+from_email: "digest@yourdomain.com"

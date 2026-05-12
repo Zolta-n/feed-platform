@@ -1,0 +1,41 @@
+{# Partial: item detail body — rendered inline via JS or for /item/<id> route #}
+{% set companies = item.company_tags|fromjson if item.company_tags else [] %}
+
+<h2 class="detail-title">{{ item.title_translated or item.title or '' }}</h2>
+
+<div class="detail-source-row">
+  <div class="avatar">{{ (item.source_name or 'XX')[:2]|upper }}</div>
+  <div>
+    <div class="detail-source-name">{{ item.source_name or '' }}</div>
+    <div class="detail-source-time">
+      {% if item.read_time_min %}{{ item.read_time_min|round(0)|int }}m read{% endif %}
+      {% if item.published_at %} · {{ item.published_at[:10] }}{% endif %}
+    </div>
+  </div>
+</div>
+
+{% if item.summary %}
+<div class="detail-summary">{{ item.summary }}</div>
+{% endif %}
+
+{% if item.why_it_matters %}
+<div class="detail-why">
+  <div class="detail-why-label">Why it matters</div>
+  <div class="detail-why-text">{{ item.why_it_matters }}</div>
+</div>
+{% endif %}
+
+{% if companies %}
+<div>
+  <div class="detail-companies-label">Companies</div>
+  <div class="card-companies">
+    {% for company in companies %}
+    <span class="company-chip">{{ company }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if item.url %}
+<a class="detail-link" href="{{ item.url }}" target="_blank" rel="noopener">Read original source →</a>
+{% endif %}

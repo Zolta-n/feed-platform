@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+{% set active_section = 'watchlist' %}
+
+{% block admin_content %}
+<div class="admin-section-title">Watchlist</div>
+
+{# Add entry form #}
+<div class="admin-card" style="margin-bottom:24px;">
+  <div class="admin-card-title">Add entry</div>
+  <form method="post" action="{{ url_for('admin.watchlist_add') }}" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    {{ csrf_token_field }}
+    <div class="form-group" style="margin:0;flex:2;min-width:160px;">
+      <label class="form-label">Name</label>
+      <input class="form-input" type="text" name="name" placeholder="Company or keyword" required>
+    </div>
+    <div class="form-group" style="margin:0;flex:3;min-width:160px;">
+      <label class="form-label">Aliases (comma-separated)</label>
+      <input class="form-input" type="text" name="aliases" placeholder="Alt name 1, Alt name 2">
+    </div>
+    <div class="form-group" style="margin:0;width:100px;">
+      <label class="form-label">Type</label>
+      <select class="form-input pref-select" name="entry_type" style="width:100%;">
+        <option value="company">company</option>
+        <option value="keyword">keyword</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin:0;width:80px;">
+      <label class="form-label">Boost</label>
+      <input class="form-input" type="number" name="boost" value="1.5" min="0" max="5" step="0.1" style="width:80px;">
+    </div>
+    <div class="form-group" style="margin:0;flex:2;min-width:120px;">
+      <label class="form-label">Role</label>
+      <input class="form-input" type="text" name="role" placeholder="customer / competitor">
+    </div>
+    <button class="admin-btn admin-btn-accent" type="submit">+ Add</button>
+  </form>
+</div>
+
+{# Watchlist table #}
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Aliases</th>
+        <th>Boost</th>
+        <th>Role</th>
+        <th>Enabled</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td style="color:var(--f1);">{{ entry.name }}</td>
+        <td>{{ entry.entry_type }}</td>
+        <td style="color:var(--f4);font-size:10px;">
+          {% set aliases = entry.aliases|fromjson if entry.aliases else [] %}
+          {{ aliases|join(', ') or '—' }}
+        </td>
+        <td>{{ entry.boost }}</td>
+        <td>{{ entry.role or '—' }}</td>
+        <td>{{ '✓' if entry.enabled else '—' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.watchlist_delete', entry_id=entry.id) }}" style="display:inline;">
+            {{ csrf_token_field }}
+            <button class="admin-btn admin-btn-danger" type="submit"
+                    data-confirm="Remove {{ entry.name }} from watchlist?">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

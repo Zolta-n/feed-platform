@@ -70,6 +70,20 @@ web_modules/
 .env.*
 !.env.example
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Local DB and Claude scratch
+niche.db
+niche.db-wal
+niche.db-shm
+.claude/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
