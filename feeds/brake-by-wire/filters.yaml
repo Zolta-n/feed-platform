@@ -1,5 +1,10 @@
 version: 1
 
+# Drop articles older than 1 year — keeps the digest fresh and prevents
+# Google News and similar aggregators from surfacing 2023-era results.
+# Items with no published_at are kept (benefit of the doubt).
+max_age_days: 365
+
 # require_any: at least one phrase must match (title OR body).
 # Acts as a topical gate — articles that never mention any brake-related
 # term get dropped before we spend LLM tokens on them.

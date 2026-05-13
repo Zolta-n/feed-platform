@@ -159,6 +159,7 @@ class FiltersRule:
 class FiltersConfig:
     block: FiltersRule | None
     require_any: FiltersRule | None
+    max_age_days: int | None = None
 
 
 @dataclass(frozen=True)

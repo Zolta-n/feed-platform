@@ -187,7 +187,18 @@ def _load_filters(feed_dir: str) -> FiltersConfig | None:
 
     block = _build_filter_rule(data.get("block"), "block")
     require_any = _build_filter_rule(data.get("require_any"), "require_any")
-    return FiltersConfig(block=block, require_any=require_any)
+    max_age_days = _parse_max_age_days(data.get("max_age_days"))
+    return FiltersConfig(block=block, require_any=require_any, max_age_days=max_age_days)
+
+
+def _parse_max_age_days(value) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int) or value <= 0:
+        raise BundleValidationError(
+            f"filters.yaml: max_age_days must be a positive int, got {value!r}"
+        )
+    return value
 
 
 def _build_filter_rule(rule_data: dict | None, name: str) -> FiltersRule | None:

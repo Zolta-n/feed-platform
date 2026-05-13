@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from niche.core.models.types import FiltersConfig, FiltersRule, Item, RawItem
 from niche.core.pipeline.filter_relevance import filter_items, filter_relevance
 
 
-def _raw(title: str, body: str = "") -> RawItem:
+def _raw(title: str, body: str = "", published_at=None) -> RawItem:
     return RawItem(
         source_id="src-1",
         url="https://example.invalid/a",
         title=title,
         body=body,
         language="en",
-        published_at=None,
+        published_at=published_at,
         fetched_at=datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc),
     )
 
@@ -300,3 +300,79 @@ def test_filter_items_block_wins_over_require():
     survivors, stats = filter_items([item], cfg)
     assert survivors == []
     assert stats["blocked"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Age cutoff (max_age_days)
+# ---------------------------------------------------------------------------
+
+def test_max_age_drops_old_raw_items():
+    now = datetime.now(timezone.utc)
+    cfg = FiltersConfig(block=None, require_any=None, max_age_days=365)
+    items = [
+        _raw("Old story", published_at=now - timedelta(days=400)),
+        _raw("Recent story", published_at=now - timedelta(days=10)),
+    ]
+    survivors, stats = filter_relevance(items, cfg)
+    assert len(survivors) == 1
+    assert survivors[0].title == "Recent story"
+    assert stats["age_dropped"] == 1
+    assert stats["samples"][0]["rule"] == "age_dropped"
+
+
+def test_max_age_keeps_items_without_published_at():
+    """Missing published_at gets the benefit of the doubt."""
+    cfg = FiltersConfig(block=None, require_any=None, max_age_days=30)
+    items = [_raw("No date", published_at=None)]
+    survivors, stats = filter_relevance(items, cfg)
+    assert len(survivors) == 1
+    assert stats["age_dropped"] == 0
+
+
+def test_max_age_none_disables_age_check():
+    cfg = FiltersConfig(block=None, require_any=None, max_age_days=None)
+    items = [_raw("Ancient", published_at=datetime(2010, 1, 1, tzinfo=timezone.utc))]
+    survivors, stats = filter_relevance(items, cfg)
+    assert len(survivors) == 1
+    assert stats == {}  # _no_active_rules → no-op
+
+
+def test_age_check_runs_before_block_check():
+    """An old + would-be-blocked item is counted as age_dropped, not blocked."""
+    now = datetime.now(timezone.utc)
+    cfg = FiltersConfig(
+        block=_rule(["transit bus"], ["title"]),
+        require_any=None,
+        max_age_days=365,
+    )
+    items = [_raw("Old transit bus story", published_at=now - timedelta(days=500))]
+    survivors, stats = filter_relevance(items, cfg)
+    assert survivors == []
+    assert stats["age_dropped"] == 1
+    assert stats["blocked"] == 0
+
+
+def test_max_age_applies_to_filter_items_path_too():
+    """The Item-side path used by the rolling pool merge also honors max_age_days."""
+    now = datetime.now(timezone.utc)
+    cfg = FiltersConfig(block=None, require_any=None, max_age_days=180)
+    old = _item(title_translated="Old article")
+    old._row = None  # n/a, _item builder doesn't use _row; set published_at manually below
+    # Construct via dataclass replace
+    from dataclasses import replace
+    old = replace(old, published_at=now - timedelta(days=200))
+    new = replace(_item(title_translated="Fresh article"), published_at=now - timedelta(days=10))
+    survivors, stats = filter_items([old, new], cfg)
+    assert len(survivors) == 1
+    assert survivors[0].title_translated == "Fresh article"
+    assert stats["age_dropped"] == 1
+
+
+def test_naive_published_at_is_treated_as_utc():
+    """Some feeds return naive datetimes — make sure the comparison still works."""
+    cfg = FiltersConfig(block=None, require_any=None, max_age_days=30)
+    naive_old = datetime.utcnow() - timedelta(days=200)  # tzinfo is None
+    items = [_raw("Naive old item", published_at=naive_old)]
+    survivors, stats = filter_relevance(items, cfg)
+    assert survivors == []
+    assert stats["age_dropped"] == 1

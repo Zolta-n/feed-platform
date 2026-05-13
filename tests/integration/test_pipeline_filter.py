@@ -71,6 +71,36 @@ def test_runner_persists_filter_stats(tmp_path, fixture_with_filters):
         assert "samples" in stats
 
 
+def test_bundle_loader_parses_max_age_days(tmp_path, feed_dir):
+    """max_age_days is parsed off the top-level of filters.yaml."""
+    import shutil
+    dst = tmp_path / "fixture-with-age"
+    shutil.copytree(feed_dir, dst)
+    (dst / "filters.yaml").write_text(
+        "version: 1\n"
+        "max_age_days: 30\n"
+        "require_any:\n"
+        "  match_fields: [title, body]\n"
+        "  phrases: [brake]\n"
+    )
+    bundle = load_bundle(str(dst))
+    assert bundle.filters is not None
+    assert bundle.filters.max_age_days == 30
+
+
+def test_bundle_loader_rejects_invalid_max_age_days(tmp_path, feed_dir):
+    import shutil
+    from niche.core.bundle_loader import BundleValidationError
+    dst = tmp_path / "fixture-bad-age"
+    shutil.copytree(feed_dir, dst)
+    (dst / "filters.yaml").write_text(
+        "version: 1\n"
+        "max_age_days: -5\n"
+    )
+    with pytest.raises(BundleValidationError):
+        load_bundle(str(dst))
+
+
 def test_rolling_pool_filters_stale_items(tmp_path, fixture_with_filters):
     """A stale Item already in the DB that matches a block phrase must not reach the digest."""
     from datetime import datetime, timezone

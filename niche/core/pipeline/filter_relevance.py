@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from niche.core.models.types import FiltersConfig, FiltersRule, Item, RawItem
 
@@ -39,18 +40,45 @@ def filter_items(
 
 
 def _no_active_rules(filters: FiltersConfig | None) -> bool:
-    return filters is None or (filters.block is None and filters.require_any is None)
+    if filters is None:
+        return True
+    return (
+        filters.block is None
+        and filters.require_any is None
+        and filters.max_age_days is None
+    )
 
 
 def _apply(items, filters, haystack_fn):
-    """Generic block/require_any apply loop, parameterised by haystack extractor."""
+    """Generic block/require_any/age apply loop, parameterised by haystack extractor."""
     survivors = []
     blocked = 0
     require_missed = 0
+    age_dropped = 0
     block_samples: list[dict] = []
     require_samples: list[dict] = []
+    age_samples: list[dict] = []
+
+    age_cutoff: datetime | None = None
+    if filters.max_age_days is not None:
+        age_cutoff = datetime.now(timezone.utc) - timedelta(days=filters.max_age_days)
 
     for item in items:
+        # Age check first — cheapest path, no regex work.
+        # Items with no published_at get the benefit of the doubt (kept).
+        published_at = getattr(item, "published_at", None)
+        if age_cutoff is not None and published_at is not None:
+            pub = published_at if published_at.tzinfo else published_at.replace(tzinfo=timezone.utc)
+            if pub < age_cutoff:
+                age_dropped += 1
+                if len(age_samples) < _SAMPLE_CAP_PER_RULE:
+                    age_samples.append({
+                        "title": _title_of(item),
+                        "matched": pub.date().isoformat(),
+                        "rule": "age_dropped",
+                    })
+                continue
+
         block_match = (
             _first_match_in_text(*haystack_fn(item, filters.block), filters.block)
             if filters.block else None
@@ -80,11 +108,12 @@ def _apply(items, filters, haystack_fn):
     stats = {
         "blocked": blocked,
         "require_missed": require_missed,
-        "samples": block_samples + require_samples,
+        "age_dropped": age_dropped,
+        "samples": block_samples + require_samples + age_samples,
     }
     logger.info(
-        "filter: in=%d out=%d blocked=%d require_missed=%d",
-        len(items), len(survivors), blocked, require_missed,
+        "filter: in=%d out=%d blocked=%d require_missed=%d age_dropped=%d",
+        len(items), len(survivors), blocked, require_missed, age_dropped,
     )
     return survivors, stats
 
