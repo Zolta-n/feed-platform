@@ -96,7 +96,7 @@ os.environ.setdefault("APPROVAL_SECRET",    "<long-random-string>")
 os.environ.setdefault("APP_URL",            "https://<username>.pythonanywhere.com")
 os.environ.setdefault("FEED_DIR",           f"{PROJECT_HOME}/feeds/brake-by-wire")
 os.environ.setdefault("DB_PATH",            f"{PROJECT_HOME}/niche.db")
-os.environ.setdefault("SCHEDULER_ENABLED",  "true")
+os.environ.setdefault("SCHEDULER_ENABLED",  "false")   # PA disables uWSGI threads — use PA Scheduled Tasks (see Step 13)
 
 from wsgi import application  # noqa: E402
 ```
@@ -162,13 +162,30 @@ Should complete and print a JSON summary with `"status": "complete"`.
 
 ---
 
-## Step 13 — Configure the daily schedule
+## Step 13 — Configure the daily schedule (PA Scheduled Tasks)
 
-Log in as admin → `/admin` → **Schedule** panel.
-Set your desired run time (e.g. `05:30`) and click **Save**.
+PythonAnywhere's shared uWSGI runs without threads, so the in-process
+APScheduler cannot start (`SCHEDULER_ENABLED` must stay `false`). Use
+PA's own Scheduled Tasks feature instead — it's a host-native cron
+runner included with the Hacker plan and above.
 
-The scheduler starts automatically when the app loads (`SCHEDULER_ENABLED=true`)
-and survives PA worker restarts via the SQLite job store.
+1. PA Dashboard → **Tasks** tab → **Create a new scheduled task**.
+2. **Command**:
+   ```bash
+   cd /home/<username>/feed-platform && /home/<username>/.virtualenvs/feed-platform/bin/python cli.py pipeline run --feed-dir feeds/brake-by-wire >> /home/<username>/feed-platform/pipeline_cron.log 2>&1
+   ```
+3. **Hour / Minute**: enter in UTC (PA tasks run in UTC, not your bundle's timezone). `05:30 Europe/Berlin` = `03:30` UTC in summer, `04:30` UTC in winter. Pick a time that doesn't need DST adjustments and stick with it.
+4. Click **Create**.
+
+PA executes the command at the configured UTC time every day. Logs land in `pipeline_cron.log` for inspection.
+
+To verify the task is registered:
+```bash
+ls -la ~/feed-platform/pipeline_cron.log    # appears after first run
+sqlite3 ~/feed-platform/niche.db "SELECT started_at, status, items_fetched, items_in_digest FROM pipeline_runs ORDER BY started_at DESC LIMIT 5;"
+```
+
+The admin UI's **Schedule** panel sets a value in the DB (`scheduler_run_time` in `app_config`) which the in-process scheduler would honor — on PA it's informational only; the actual schedule is in PA's Tasks tab.
 
 ---
 

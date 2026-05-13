@@ -132,6 +132,14 @@ def create_app(config: dict | None = None) -> Flask:
 
 
 def _start_scheduler(app: Flask, bundle) -> None:
+    """Start an in-process APScheduler for daily pipeline + weekly prune.
+
+    Hosts that disable threading (PythonAnywhere's shared uWSGI) cannot run
+    APScheduler in-process — set SCHEDULER_ENABLED=false on those hosts and
+    use the host's native cron-style scheduler (PA Scheduled Tasks) to run
+    `python cli.py pipeline run` directly. Any failure here is logged and
+    swallowed so a misconfig never takes the site down.
+    """
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -150,50 +158,57 @@ def _start_scheduler(app: Flask, bundle) -> None:
 
         hour, minute = run_time.split(":")
         tz = ZoneInfo(bundle.config.timezone)
+
+        scheduler = BackgroundScheduler(
+            jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")},
+            job_defaults={"misfire_grace_time": 3600},
+        )
+        # Store reference so admin can reschedule without restart
+        app.config["SCHEDULER"] = scheduler
+
+        def _run_pipeline() -> None:
+            import uuid
+            from niche.core.pipeline.runner import run_pipeline
+            from niche.core.models.repository import Repository as _Repo
+            with app.app_context():
+                worker_repo = _Repo(db_path)
+                try:
+                    run_pipeline(bundle, worker_repo, uuid.uuid4().hex)
+                finally:
+                    worker_repo.close()
+
+        scheduler.add_job(
+            _run_pipeline,
+            CronTrigger(hour=int(hour), minute=int(minute), timezone=tz),
+            id="daily_pipeline",
+            replace_existing=True,
+        )
+
+        def _prune_read_log() -> None:
+            from niche.core.models.repository import Repository as _Repo
+            with app.app_context():
+                worker_repo = _Repo(db_path)
+                try:
+                    worker_repo.prune_read_log(days=180)
+                finally:
+                    worker_repo.close()
+
+        scheduler.add_job(
+            _prune_read_log,
+            CronTrigger(day_of_week="sun", hour=3, minute=0, timezone=tz),
+            id="weekly_prune_read_log",
+            replace_existing=True,
+        )
+
+        scheduler.start()
+        logger.info("Scheduler started: daily pipeline at %s %s", run_time, bundle.config.timezone)
     except Exception as exc:
-        logger.warning("Scheduler not started: %s", exc)
-        return
-
-    scheduler = BackgroundScheduler(
-        jobstores={"default": SQLAlchemyJobStore(url=f"sqlite:///{db_path}")},
-        job_defaults={"misfire_grace_time": 3600},
-    )
-    # Store reference so admin can reschedule without restart
-    app.config["SCHEDULER"] = scheduler
-
-    def _run_pipeline() -> None:
-        import uuid
-        from niche.core.pipeline.runner import run_pipeline
-        from niche.core.models.repository import Repository as _Repo
-        with app.app_context():
-            worker_repo = _Repo(db_path)
-            try:
-                run_pipeline(bundle, worker_repo, uuid.uuid4().hex)
-            finally:
-                worker_repo.close()
-
-    scheduler.add_job(
-        _run_pipeline,
-        CronTrigger(hour=int(hour), minute=int(minute), timezone=tz),
-        id="daily_pipeline",
-        replace_existing=True,
-    )
-
-    def _prune_read_log() -> None:
-        from niche.core.models.repository import Repository as _Repo
-        with app.app_context():
-            worker_repo = _Repo(db_path)
-            try:
-                worker_repo.prune_read_log(days=180)
-            finally:
-                worker_repo.close()
-
-    scheduler.add_job(
-        _prune_read_log,
-        CronTrigger(day_of_week="sun", hour=3, minute=0, timezone=tz),
-        id="weekly_prune_read_log",
-        replace_existing=True,
-    )
-
-    scheduler.start()
-    logger.info("Scheduler started: daily pipeline at %s %s", run_time, bundle.config.timezone)
+        # Common failure on PythonAnywhere: "scheduler seems to be running
+        # under uWSGI, but threads have been disabled". Log and continue —
+        # use host-native cron (PA Scheduled Tasks) on those deployments.
+        logger.warning(
+            "In-process scheduler not started (%s) — set SCHEDULER_ENABLED=false "
+            "and use host-native cron / Scheduled Tasks to run the pipeline.",
+            exc,
+        )
+        app.config.pop("SCHEDULER", None)
