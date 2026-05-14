@@ -272,9 +272,10 @@ def watchlist_edit(entry_id: str):
     data = request.form
     aliases_raw = data.get("aliases", "")
     aliases = [a.strip() for a in aliases_raw.split(",") if a.strip()]
+    name = data.get("name", entry_id)
     repo.upsert_watchlist_entry(bundle.config.feed_id, {
         "id": entry_id,
-        "name": data.get("name", entry_id),
+        "name": name,
         "entry_type": data.get("entry_type", "company"),
         "aliases": _json.dumps(aliases),
         "boost": float(data.get("boost", 1.5)),
@@ -282,7 +283,8 @@ def watchlist_edit(entry_id: str):
         "notes": data.get("notes", ""),
         "enabled": int(data.get("enabled", "1")),
     })
-    return jsonify({"ok": True})
+    flash(f"Updated '{name}'.", "info")
+    return redirect(url_for("admin.watchlist"))
 
 
 @bp.route("/watchlist/<entry_id>/delete", methods=["POST"])
