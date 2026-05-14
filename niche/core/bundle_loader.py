@@ -109,6 +109,7 @@ def _load_config(feed_dir: str) -> FeedConfig:
         timezone=data["timezone"],
         daily_run_time=data["daily_run_time"],
         from_email=data["from_email"],
+        search_context=data.get("search_context"),
     )
 
 

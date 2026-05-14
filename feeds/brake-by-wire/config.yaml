@@ -8,3 +8,7 @@ default_ui_language: en
 timezone: Europe/Berlin
 daily_run_time: "05:30"
 from_email: "digest@businessintels.com"
+# Appended to each watchlist keyword entry when generating Google News
+# queries — scopes "Sensify" to "Sensify brake" so we don't pull
+# unrelated Spotify/sports/etc. hits.
+search_context: "brake"

@@ -146,6 +146,7 @@ class FeedConfig:
     timezone: str
     daily_run_time: str
     from_email: str
+    search_context: str | None = None
 
 
 @dataclass(frozen=True)

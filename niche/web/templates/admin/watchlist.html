@@ -21,6 +21,10 @@
   Matching items receive a relevance boost in the daily digest.
   Changes take effect on the next pipeline run.
 </p>
+<p style="color:var(--muted); font-size:0.8rem; margin-bottom:1.5rem; padding:0.65rem 0.85rem; background:rgba(124,58,237,0.08); border-left:2px solid #7c3aed; border-radius:4px;">
+  <strong style="color:#c4b5fd;">company</strong> — boosts articles that mention this entry (and its aliases).
+  <strong style="color:#c4b5fd;">keyword</strong> — same boost <em>plus</em> generates a Google News search query each run, so the pipeline actively pulls fresh news about it. Use this for products, technologies, or specific topics you want covered (e.g. "Brembo Sensify", "iBooster").
+</p>
 
 <h2>Entries ({{ entries|length }})</h2>
 {% if entries %}

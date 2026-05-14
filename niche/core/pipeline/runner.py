@@ -16,7 +16,7 @@ from niche.core.pipeline.filter_relevance import filter_items, filter_relevance
 from niche.core.pipeline.rank import rank
 from niche.core.pipeline.summarize import summarize
 from niche.core.pipeline.translate import translate
-from niche.core.sources.factory import build_sources
+from niche.core.sources.factory import build_sources, dynamic_sources_from_watchlist
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +80,16 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
     results: list[StageResult] = []
 
     try:
-        # Sync sources from bundle config into DB before any item inserts
-        for src_cfg in bundle.sources:
+        # Build the full source list: static (from bundle YAML) + dynamic
+        # (Google News queries generated from watchlist keyword entries).
+        # Dynamic sources let the admin steer pipeline search at runtime.
+        dynamic = dynamic_sources_from_watchlist(repo, bundle.config)
+        all_source_configs = list(bundle.sources) + dynamic
+        if dynamic:
+            logger.info("run_id=%s dynamic sources from watchlist: %d", run_id, len(dynamic))
+
+        # Sync sources from bundle config + dynamic into DB before any item inserts
+        for src_cfg in all_source_configs:
             repo.upsert_source({
                 "id": src_cfg.id,
                 "feed_id": src_cfg.feed_id,
@@ -92,12 +100,12 @@ def run_pipeline(bundle: FeedBundle, repo: Repository, run_id: str) -> list[Stag
                 "default_topic": src_cfg.default_topic,
                 "source_weight": src_cfg.source_weight,
                 "enabled": int(src_cfg.enabled),
-                "added_by": "config",
+                "added_by": "config" if src_cfg in bundle.sources else "watchlist",
             })
 
         # --- Fetch ---
         t0 = time.monotonic()
-        sources = build_sources(list(bundle.sources), repo)
+        sources = build_sources(all_source_configs, repo)
         raw_items = []
         for source in sources:
             fetched = source.fetch()

@@ -101,6 +101,39 @@ def test_bundle_loader_rejects_invalid_max_age_days(tmp_path, feed_dir):
         load_bundle(str(dst))
 
 
+def test_watchlist_keyword_becomes_dynamic_source(tmp_path, fixture_with_filters):
+    """A watchlist entry of type 'keyword' produces a gnews-kw-* source row
+    in the sources table after a pipeline run."""
+    from niche.core.models.repository import Repository
+    from niche.core.sources.factory import dynamic_sources_from_watchlist
+
+    db_path = str(tmp_path / "watchlist.db")
+    repo = Repository(db_path)
+    repo.create_schema()
+    bundle = load_bundle(fixture_with_filters)
+
+    repo.upsert_watchlist_entry(bundle.config.feed_id, {
+        "id": "wl-1",
+        "entry_type": "keyword",
+        "name": "Brembo Sensify",
+        "aliases": [],
+        "boost": 2.0,
+        "role": "tier1",
+        "notes": None,
+        "enabled": 1,
+    })
+
+    # search_context is None for test-fixture (it doesn't set one) → query is name only
+    dynamic = dynamic_sources_from_watchlist(repo, bundle.config)
+    assert len(dynamic) == 1
+    assert dynamic[0].id == "gnews-kw-brembo-sensify"
+    assert dynamic[0].source_weight == 2.0
+    assert dynamic[0].default_topic == "tier1"
+    assert "Brembo" in dynamic[0].url
+
+    repo.close()
+
+
 def test_rolling_pool_filters_stale_items(tmp_path, fixture_with_filters):
     """A stale Item already in the DB that matches a block phrase must not reach the digest."""
     from datetime import datetime, timezone
