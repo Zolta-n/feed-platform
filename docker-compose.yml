@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  bbw:
+    build: .
+    container_name: bbw
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./feeds:/app/feeds   # feed config, prompts, sources — editable without rebuild
+      - ./data:/app/data     # SQLite database — persists across container rebuilds
+    env_file: .env
