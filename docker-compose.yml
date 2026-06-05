@@ -1,0 +1,18 @@
+version: "3.9"
+
+# Deployed on the Synology NAS at /volume1/docker/feed-platform/
+# Pulls the image built and pushed by GitHub Actions (.github/workflows/docker-publish.yml).
+# Watchtower polls ghcr.io and auto-restarts this container when a new :latest lands.
+# See DEPLOY_SYNOLOGY.md for the full setup.
+
+services:
+  feed-platform-app:
+    image: ghcr.io/zolta-n/feed-platform:latest
+    container_name: feed-platform-app
+    ports:
+      - "8001:8000"          # host 8001 (8000 is taken by the reporting app) -> container 8000
+    restart: unless-stopped
+    env_file:
+      - .env                 # secrets + config; never committed (see DEPLOY_SYNOLOGY.md Step 3)
+    volumes:
+      - ./data:/app/data     # persists niche.db (DB_PATH=/app/data/niche.db)

@@ -1,0 +1,17 @@
+version: "3.9"
+
+# One Watchtower watches ALL containers on the NAS. If you already run Watchtower
+# from another deploy (e.g. the reporting app), you do NOT need this — that instance
+# will pick up feed-platform-app automatically. See DEPLOY_SYNOLOGY.md Step 4.
+
+services:
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=300   # poll ghcr.io every 5 minutes
+      - WATCHTOWER_CLEANUP=true        # remove old images after update
+      - WATCHTOWER_INCLUDE_STOPPED=false
