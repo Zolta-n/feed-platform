@@ -49,24 +49,79 @@ GitHub → **Actions** tab → confirm "Build and Push Docker Image" shows a gre
 
 ### Step 2 — Make the GHCR package public
 
-So Watchtower can pull without credentials:
+Watchtower (and the NAS `docker pull`) needs to fetch the image anonymously. The image is private
+by default, so make its package public.
 
-1. Go to `https://github.com/Zolta-n/feed-platform/pkgs/container/feed-platform`
-2. **Package settings** → **Danger Zone** → Change visibility → **Public** → confirm.
+> **The package does not exist until Step 1's build succeeds.** Confirm the green tick in the
+> **Actions** tab first — only then does the package appear under your account.
+
+1. **Find the package.** Either:
+   - Open `https://github.com/Zolta-n/feed-platform` → right sidebar → **Packages** → click
+     **feed-platform**, **or**
+   - Go directly to
+     `https://github.com/users/Zolta-n/packages/container/feed-platform/settings`.
+2. On the package page click **Package settings** (top-right gear, or the link in the sidebar).
+3. Scroll to the bottom — **Danger Zone** → **Change visibility**.
+4. Select **Public**, then type the package name `feed-platform` to confirm → **I understand,
+   change package visibility**.
+5. *(First build only)* Back on the package page, make sure it's **linked to the repository**:
+   Package settings → **Manage Actions access** should already list `Zolta-n/feed-platform` with
+   Write (the workflow's `GITHUB_TOKEN` does this automatically). No action needed if present.
+
+**Verify it's public** from any machine *without* logging in to GHCR:
+
+```bash
+docker pull ghcr.io/zolta-n/feed-platform:latest    # succeeds if public
+```
+
+(or open the package page in a private/incognito browser window — a public package is viewable
+logged-out.)
+
+> **Prefer to keep it private?** Then skip this step and instead give the NAS a credential: create a
+> GitHub **Personal Access Token (classic)** with `read:packages`, and on the NAS run
+> `docker login ghcr.io -u Zolta-n -p <token>` once. Watchtower will reuse `~/.docker/config.json`.
+> The public route is simpler and matches the reporting app — recommended.
 
 ### Step 3 — Create the NAS app folder + `.env`
 
-In **File Station** create `/volume1/docker/feed-platform/` and a `data/` subfolder inside it.
-Upload `docker-compose.yml` (from this repo) into `/volume1/docker/feed-platform/`.
+You need a folder on the NAS holding `docker-compose.yml`, a `data/` subfolder for the database, and
+a `.env` file with secrets. Do it via **File Station** (GUI) or **SSH** — both shown.
 
-Create a file `/volume1/docker/feed-platform/.env` (NEVER committed) with:
+**3a. Create the folders.**
+
+*File Station route:* DSM → **File Station** → open the existing **`docker`** shared folder (the
+same one holding `reporting/` and `cloudflare/`) → **Create → Create folder** → `feed-platform`.
+Open it → **Create folder** → `data`.
+
+*SSH route:*
+```bash
+ssh admin@192.168.50.70
+sudo mkdir -p /volume1/docker/feed-platform/data
+```
+
+**3b. Get `docker-compose.yml` onto the NAS.** Download it from the repo's `deploy` branch
+(GitHub → file → **Raw → Save as**) and upload it into `/volume1/docker/feed-platform/` via File
+Station. Or via SSH from a clone: `scp docker-compose.yml admin@192.168.50.70:/volume1/docker/feed-platform/`.
+
+**3c. Generate the two secrets.** Each must be a long random string. On the NAS (`openssl` ships
+with DSM):
+```bash
+openssl rand -hex 32     # run twice → one value for SESSION_SECRET, one for APPROVAL_SECRET
+```
+(Any machine works; or `python3 -c "import secrets; print(secrets.token_hex(32))"` if you have Python.)
+
+**3d. Create `/volume1/docker/feed-platform/.env`** (DSM **Text Editor** package, or `vi` over SSH).
+This file lives **only on the NAS** — never commit it. Contents:
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
-SESSION_SECRET=<paste output of: python3 -c "import secrets; print(secrets.token_hex(32))">
-APPROVAL_SECRET=<paste a SECOND token_hex(32)>
-RESEND_API_KEY=re_...            # leave blank for dev (magic links shown directly)
-DEEPL_API_KEY=                   # blank → Haiku fallback for translation
+# ── Secrets ──────────────────────────────────────────────
+ANTHROPIC_API_KEY=sk-ant-...        # from console.anthropic.com
+SESSION_SECRET=<first openssl rand -hex 32 value>
+APPROVAL_SECRET=<second openssl rand -hex 32 value>
+RESEND_API_KEY=re_...               # from resend.com; leave BLANK for dev (magic links shown in logs)
+DEEPL_API_KEY=                      # optional; blank → Haiku fallback for translation
+
+# ── Config ───────────────────────────────────────────────
 APP_URL=https://bbw.businessintels.com
 FEED_DIR=/app/feeds/brake-by-wire
 DB_PATH=/app/data/niche.db
@@ -78,8 +133,16 @@ SCHEDULER_ENABLED=false
 > `NICHE_DB_PATH` (else defaults to an ephemeral in-container `niche.db`). Setting both points the
 > web app *and* every CLI/scheduled run at the same persisted DB on the mounted volume.
 
-Also set the feed's sender to a Resend-verified address in
-`feeds/brake-by-wire/config.yaml` (`from_email: ...`) — otherwise digest sends are rejected.
+**3e. Lock down the file** so secrets aren't world-readable (SSH):
+```bash
+sudo chmod 600 /volume1/docker/feed-platform/.env
+```
+
+**3f. Sender address — usually nothing to do.** `from_email` is already
+`digest@businessintels.com` in `feeds/brake-by-wire/config.yaml`. As long as **businessintels.com is
+verified in Resend** (it is for the reporting app), digests send fine. This value is **baked into
+the image**, not read from `.env`, so to change it you edit `config.yaml` in the repo on the
+`deploy` branch and push (CI rebuilds) — it cannot be changed on the NAS.
 
 ### Step 4 — Watchtower (skip if already running)
 
